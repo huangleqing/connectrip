@@ -52,7 +52,9 @@
 | 权限标识 | 说明 |
 | --- | --- |
 | `operation:view` | 查看操作中心 |
-| `operation:export` | 导出操作数据 |
+| `operation:export` | 导出操作数据（Excel） |
+| `operation:amount:view` | 查看操作金额；未授权时前端显示 `****` |
+| `operation:line:*` | 线路 / 国家数据权限，如 `operation:line:laos`、`operation:line:thailand` |
 | `system:user:view` | 查看用户列表 |
 | `system:user:create` | 新增用户 |
 | `system:user:update` | 编辑用户 / 启停账号 |
@@ -63,13 +65,16 @@
 | `system:role:update` | 编辑角色 / 分配权限 |
 | `system:role:delete` | 删除角色 |
 
+已有数据库升级操作中心权限时，在 `backend/` 执行 `npm run permissions:sync`，只补充线路/金额权限并授权内置角色，不重置用户数据。
+
 ### 2.3 前端权限流程
 
-1. `POST /api/auth/login` 返回 `token` 与包含 `permissions` 的 `user`
-2. 前端把 Token 存入 localStorage，把用户与权限写入 `initialState`
-3. 刷新页面时调用 `GET /api/auth/me`
-4. `src/access.ts` 将 `permissions` 转成菜单/按钮判断
-5. 路由 `access` 控制菜单显示，`<Access>` 控制按钮显示
+1. 登录页调用 `GET /api/auth/captcha` 获取一次性图形验证码
+2. `POST /api/auth/login` 校验验证码与账号密码，返回 `token` 与包含 `permissions` 的 `user`
+3. 前端把 Token 存入 localStorage，把用户与权限写入 `initialState`
+4. 刷新页面时调用 `GET /api/auth/me`
+5. `frontend/src/access.ts` 将 `permissions` 转成菜单/按钮判断
+6. 路由 `access` 控制菜单显示，`<Access>` 控制按钮显示
 
 后端必须在每个受保护接口上再次校验权限，不能依赖前端隐藏按钮。
 
@@ -143,8 +148,10 @@ interface Role {
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
+| GET | `/api/auth/captcha` | 公开 | 获取图形验证码 |
 | POST | `/api/auth/login` | 公开 | 登录 |
 | GET | `/api/auth/me` | 登录 | 当前用户与权限 |
+| POST | `/api/auth/change-password` | 登录 | 修改当前登录密码 |
 | POST | `/api/auth/logout` | 登录 | 退出（无状态 JWT 可直接返回成功） |
 | GET | `/api/dashboard/summary` | 登录 | 工作台概览 |
 | GET | `/api/system/users` | `system:user:view` | 用户分页列表 |
@@ -155,19 +162,53 @@ interface Role {
 | DELETE | `/api/system/users/:id` | `system:user:delete` | 删除用户 |
 | GET | `/api/system/roles` | `system:role:view` | 角色分页列表 |
 | GET | `/api/system/roles/options` | 登录 | 角色下拉选项 |
+| GET | `/api/system/roles/:id/user-options` | `system:role:update` | 角色成员管理的用户列表 |
 | GET | `/api/system/permissions` | `system:role:view` | 权限树 |
 | POST | `/api/system/roles` | `system:role:create` | 新建角色 |
+| POST | `/api/system/roles/:id/members` | `system:role:update` | 给当前角色批量添加 / 移除成员 |
 | PUT | `/api/system/roles/:id` | `system:role:update` | 编辑角色 / 分配权限 |
 | DELETE | `/api/system/roles/:id` | `system:role:delete` | 删除角色 |
 
 ### 4.1 登录
 
+登录前先获取一次性图形验证码：
+
+```http
+GET /api/auth/captcha
+```
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "captchaId": "0f5dd1d1-6ef6-44a9-91bf-4d3f8b4e1c65",
+    "image": "data:image/svg+xml;base64,...",
+    "expiresIn": 120
+  }
+}
+```
+
+然后提交账号、密码和验证码：
+
 ```http
 POST /api/auth/login
 Content-Type: application/json
 
-{ "username": "admin", "password": "admin123" }
+{
+  "username": "admin",
+  "password": "admin123",
+  "captchaId": "0f5dd1d1-6ef6-44a9-91bf-4d3f8b4e1c65",
+  "captchaCode": "7K3P"
+}
 ```
+
+验证码规则：
+
+- 有效期 2 分钟
+- 只能使用一次，成功或失败后均失效
+- 验证码校验通过后才会校验账号密码
+- 当前实现使用服务端内存存储，多实例部署时应改用 Redis 等共享存储
 
 ```json
 {
@@ -180,7 +221,13 @@ Content-Type: application/json
       "username": "admin",
       "nickname": "林悦",
       "roles": [{ "id": 1, "code": "super_admin", "name": "超级管理员" }],
-      "permissions": ["operation:view", "operation:export", "system:user:view"],
+      "permissions": [
+        "operation:view",
+        "operation:export",
+        "system:user:view",
+        "operation:line:laos",
+        "operation:line:thailand"
+      ],
       "isSuperAdmin": true
     }
   }
@@ -200,6 +247,33 @@ Authorization: Bearer <token>
 ```
 
 返回 `CurrentUser`。该接口必须返回**最新的角色权限**，以便前端刷新 `initialState`。
+
+#### 4.2.1 修改当前用户密码
+
+```http
+POST /api/auth/change-password
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "oldPassword": "oldPassword123",
+  "newPassword": "newPassword123"
+}
+```
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": { "success": true }
+}
+```
+
+- 必须校验当前密码
+- 新密码长度 6-32 位
+- 新密码不能与当前密码相同
+- 管理员为用户修改密码使用 `POST /api/system/users/:id/reset-password`，需要 `system:user:reset-password` 权限
+- 密码使用 bcrypt 单向哈希存储，任何接口都不会返回密码明文
 
 ### 4.3 用户列表
 
@@ -263,7 +337,7 @@ PATCH /api/system/users/:id/status
 { "status": "disabled" }
 ```
 
-### 4.7 重置密码
+### 4.7 修改用户登录密码
 
 ```http
 POST /api/system/users/:id/reset-password
@@ -271,7 +345,10 @@ POST /api/system/users/:id/reset-password
 { "password": "newPassword123" }
 ```
 
-建议记录操作日志，并使旧 Token 失效（例如增加 `tokenVersion`）。
+- 需要 `system:user:reset-password` 权限，超级管理员默认拥有
+- 密码使用 bcrypt 单向哈希存储，后端和前端都不提供“查看明文密码”的能力
+- 管理员只能为用户设置新密码；用户下一次登录时使用新密码
+- 建议记录操作日志，并使旧 Token 失效（例如增加 `tokenVersion`）
 
 ### 4.8 删除用户
 
@@ -329,7 +406,18 @@ GET /api/system/permissions
       "type": "group",
       "children": [
         { "key": "operation:view", "title": "查看操作中心", "type": "menu" },
-        { "key": "operation:export", "title": "导出操作数据", "type": "button" }
+        { "key": "operation:export", "title": "导出操作数据（Excel）", "type": "button" },
+        { "key": "operation:amount:view", "title": "查看操作金额", "type": "button" }
+      ]
+    },
+    {
+      "key": "group:operation-line",
+      "title": "线路 / 国家权限",
+      "type": "group",
+      "children": [
+        { "key": "operation:line:laos", "title": "老挝-LAO", "type": "button" },
+        { "key": "operation:line:thailand", "title": "泰国-THA", "type": "button" },
+        { "key": "operation:line:malaysia", "title": "马来西亚-MYS", "type": "button" }
       ]
     }
   ]
@@ -339,6 +427,9 @@ GET /api/system/permissions
 - `group` 仅用于分组，不会保存到角色权限
 - 角色 `permissions` 只保存 `menu` / `button` 的权限标识
 - 前端权限树会自动过滤父级节点，只提交叶子权限
+- 示例中只列出部分线路，实际线路权限共 17 项；完整列表见 `backend/src/common/constants/permissions.ts`
+- 线路权限同样保存为叶子权限；后端操作列表接口应按当前用户持有的 `operation:line:*` 过滤团队，不能只依赖前端隐藏标签
+- 金额字段应在后端响应中按 `operation:amount:view` 脱敏，导出接口也必须执行同一校验
 
 ### 4.12 新建角色
 
@@ -383,7 +474,65 @@ DELETE /api/system/roles/:id
 - 系统内置角色不可删除
 - 角色下还有成员时禁止删除，前端会提示先移除成员
 
-### 4.15 工作台概览
+### 4.15 角色成员管理
+
+角色页的「成员管理」固定操作当前角色，需要加载用户列表及是否已属于该角色：
+
+```http
+GET /api/system/roles/2/user-options?keyword=&limit=200
+```
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "id": 3,
+      "username": "viewer",
+      "nickname": "苏晴",
+      "status": "active",
+      "isMember": false,
+      "roles": [{ "id": 3, "code": "viewer", "name": "只读访客" }]
+    }
+  ]
+}
+```
+
+给当前角色批量添加或移除用户：
+
+```http
+POST /api/system/roles/2/members
+Content-Type: application/json
+
+{
+  "action": "add",
+  "userIds": [3, 5]
+}
+```
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "success": true,
+    "action": "add",
+    "affected": 2,
+    "userCount": 6
+  }
+}
+```
+
+- 成员管理只作用于 URL 中指定的角色，不能同时操作多个角色
+- `action` 取值 `add` 或 `remove`
+- `add` 只会把用户加入当前角色，不会移除用户已有的其他角色
+- 已存在的关联会被忽略，`affected` 为实际变更数量
+- `remove` 只删除当前角色与用户的关联，不删除用户或其他角色
+- `super_admin` 角色只能由超级管理员添加成员；不允许批量移除 `super_admin` 角色
+- 接口使用 `system:role:update` 权限
+
+### 4.16 工作台概览
 
 ```http
 GET /api/dashboard/summary

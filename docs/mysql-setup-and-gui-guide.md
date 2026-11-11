@@ -260,8 +260,15 @@ npm run db:setup
 ```text
 Applying migration `20261103000000_init`
 All migrations have been successfully applied.
-种子数据完成：11 个权限、4 个角色、12 个用户
+种子数据完成：29 个权限、4 个角色、12 个用户
 演示账号：admin/admin123、operator/operator123、viewer/viewer123
+```
+
+如果数据库是旧版本初始化、需要补充操作中心线路/金额权限，执行：
+
+```bash
+cd backend
+npm run permissions:sync
 ```
 
 ### 3. 验证数据
@@ -298,10 +305,9 @@ npm run start:dev
 
 ```powershell
 curl.exe http://localhost:3000/api/health
-curl.exe -X POST http://localhost:3000/api/auth/login `
-  -H "Content-Type: application/json" `
-  -d '{"username":"admin","password":"admin123"}'
 ```
+
+登录接口现在需要图形验证码，建议直接打开前端 http://localhost:8000 使用页面登录。
 
 ### 5. 启动前端
 

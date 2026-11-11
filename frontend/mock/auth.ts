@@ -1,13 +1,27 @@
+import { createMockCaptcha, verifyMockCaptcha } from './captcha';
 import { createToken, toCurrentUser, users } from './db';
 import { fail, ok, requireAuth } from './helpers';
 
 export default {
+  'GET /api/auth/captcha': (_req: any, res: any) => {
+    return ok(res, createMockCaptcha());
+  },
+
   'POST /api/auth/login': (req: any, res: any) => {
     const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const captchaId = typeof req.body?.captchaId === 'string' ? req.body.captchaId : '';
+    const captchaCode =
+      typeof req.body?.captchaCode === 'string' ? req.body.captchaCode : '';
 
     if (!username || !password) {
       return fail(res, 400, '请输入账号和密码');
+    }
+    if (!captchaId || !captchaCode) {
+      return fail(res, 400, '请输入验证码');
+    }
+    if (!verifyMockCaptcha(captchaId, captchaCode)) {
+      return fail(res, 400, '验证码错误或已过期，请刷新验证码');
     }
 
     const user = users.find((item) => item.username.toLowerCase() === username.toLowerCase());

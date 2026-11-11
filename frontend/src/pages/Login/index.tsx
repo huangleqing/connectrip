@@ -2,16 +2,17 @@ import {
   ApartmentOutlined,
   LockOutlined,
   SafetyCertificateOutlined,
+  SafetyOutlined,
   ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { ProForm, ProFormText, type ProFormInstance } from '@ant-design/pro-components';
 import { history, useModel } from '@umijs/max';
 import { useRequest } from 'ahooks';
-import { App, Tag } from 'antd';
-import { useEffect, useRef } from 'react';
-import { getCurrentUser, login } from '@/services/auth';
-import type { InitialState, LoginParams } from '@/types';
+import { App, Button, Input, Space, Spin, Tag } from 'antd';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { getCaptcha, getCurrentUser, login } from '@/services/auth';
+import type { CaptchaResult, InitialState } from '@/types';
 import { AUTH_NOTICE_KEY, getSafeRedirect, setToken } from '@/utils/auth';
 import './index.less';
 
@@ -57,6 +58,61 @@ const DEMO_ACCOUNTS = [
   },
 ];
 
+interface LoginFormValues {
+  username: string;
+  password: string;
+  captchaCode: string;
+}
+
+interface CaptchaInputProps {
+  id?: string;
+  value?: string;
+  onChange?: (value: string) => void;
+  captcha?: CaptchaResult;
+  loading: boolean;
+  onRefresh: () => void;
+}
+
+function CaptchaInput({
+  id,
+  value,
+  onChange,
+  captcha,
+  loading,
+  onRefresh,
+}: CaptchaInputProps) {
+  return (
+    <Space.Compact block>
+      <Input
+        id={id}
+        size="large"
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
+        placeholder="请输入图形验证码"
+        maxLength={6}
+        autoComplete="off"
+        prefix={<SafetyOutlined className="login-field-icon" />}
+      />
+      <Button
+        type="default"
+        size="large"
+        className="login-captcha-addon"
+        onClick={onRefresh}
+        title="点击刷新验证码"
+        aria-label="刷新验证码"
+      >
+        {loading ? (
+          <Spin size="small" />
+        ) : captcha?.image ? (
+          <img src={captcha.image} alt="图形验证码" draggable={false} />
+        ) : (
+          <span>点击刷新</span>
+        )}
+      </Button>
+    </Space.Compact>
+  );
+}
+
 function resolveRedirect() {
   const redirect = new URLSearchParams(window.location.search).get('redirect');
   return getSafeRedirect(redirect);
@@ -65,9 +121,14 @@ function resolveRedirect() {
 export default function LoginPage() {
   const { message } = App.useApp();
   const { initialState, setInitialState } = useModel('@@initialState');
-  const formRef = useRef<ProFormInstance<LoginParams>>();
+  const formRef = useRef<ProFormInstance<LoginFormValues>>();
 
   const { runAsync: submitLogin, loading } = useRequest(login, { manual: true });
+  const {
+    data: captcha,
+    loading: captchaLoading,
+    runAsync: loadCaptcha,
+  } = useRequest(getCaptcha, { manual: true });
 
   useEffect(() => {
     if (initialState?.currentUser) {
@@ -83,9 +144,33 @@ export default function LoginPage() {
     }
   }, [message]);
 
-  const handleFinish = async (values: LoginParams) => {
+  useEffect(() => {
+    loadCaptcha().catch(() => {
+      // 错误提示由请求层统一处理
+    });
+  }, []);
+
+  const refreshCaptcha = () => {
+    formRef.current?.setFieldsValue({ captchaCode: '' });
+    loadCaptcha().catch(() => {
+      // 错误提示由请求层统一处理
+    });
+  };
+
+  const handleFinish = async (values: LoginFormValues) => {
+    if (!captcha?.captchaId) {
+      message.warning('验证码已失效，请刷新后重试');
+      refreshCaptcha();
+      return;
+    }
+
     try {
-      const result = await submitLogin(values);
+      const result = await submitLogin({
+        username: values.username,
+        password: values.password,
+        captchaId: captcha.captchaId,
+        captchaCode: values.captchaCode,
+      });
       setToken(result.token);
       await setInitialState((prev: InitialState | undefined) => ({
         currentUser: result.user,
@@ -95,7 +180,25 @@ export default function LoginPage() {
       message.success(`欢迎回来，${result.user.nickname}`);
       history.replace(resolveRedirect());
     } catch {
-      // 错误提示由 request 拦截器统一展示
+      // 登录失败后验证码已被后端消费，必须刷新
+      formRef.current?.setFieldsValue({ captchaCode: '' });
+      loadCaptcha().catch(() => {
+        // 错误提示由请求层统一处理
+      });
+    }
+  };
+
+  const handleLoginKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (
+      event.key === 'Enter' &&
+      !event.shiftKey &&
+      target.tagName === 'INPUT' &&
+      !loading &&
+      !captchaLoading
+    ) {
+      event.preventDefault();
+      formRef.current?.submit();
     }
   };
 
@@ -178,52 +281,65 @@ export default function LoginPage() {
               <p>登录你的工作台，开始今天的旅程管理。</p>
             </div>
 
-            <ProForm<LoginParams>
-              formRef={formRef}
-              layout="vertical"
-              requiredMark={false}
-              onFinish={handleFinish}
-              submitter={{
-                searchConfig: { submitText: '登 录' },
-                submitButtonProps: {
-                  size: 'large',
-                  block: true,
-                  loading,
-                  style: { height: 48, fontSize: 15, fontWeight: 600 },
-                },
-                resetButtonProps: false,
-              }}
-            >
-              <ProFormText
-                name="username"
-                label="账号"
-                placeholder="请输入登录账号"
-                rules={[{ required: true, message: '请输入登录账号' }]}
-                fieldProps={{
-                  size: 'large',
-                  prefix: <UserOutlined className="login-field-icon" />,
-                  autoComplete: 'username',
-                  allowClear: true,
+            <div className="login-form" onKeyDown={handleLoginKeyDown}>
+              <ProForm<LoginFormValues>
+                formRef={formRef}
+                layout="vertical"
+                requiredMark={false}
+                onFinish={handleFinish}
+                submitter={{
+                  searchConfig: { submitText: '登 录' },
+                  submitButtonProps: {
+                    size: 'large',
+                    block: true,
+                    loading,
+                    style: { height: 48, fontSize: 15, fontWeight: 600 },
+                  },
+                  resetButtonProps: false,
                 }}
-              />
-              <ProFormText.Password
-                name="password"
-                label="密码"
-                placeholder="请输入登录密码"
-                rules={[{ required: true, message: '请输入登录密码' }]}
-                fieldProps={{
-                  size: 'large',
-                  prefix: <LockOutlined className="login-field-icon" />,
-                  autoComplete: 'current-password',
-                }}
-              />
-              <div className="login-card__security">
-                <span>
-                  <SafetyCertificateOutlined /> JWT 安全鉴权
-                </span>
-                <span>登录态自动续期校验</span>
-              </div>
-            </ProForm>
+              >
+                <ProFormText
+                  name="username"
+                  label="账号"
+                  placeholder="请输入登录账号"
+                  rules={[{ required: true, message: '请输入登录账号' }]}
+                  fieldProps={{
+                    size: 'large',
+                    prefix: <UserOutlined className="login-field-icon" />,
+                    autoComplete: 'username',
+                    allowClear: true,
+                  }}
+                />
+                <ProFormText.Password
+                  name="password"
+                  label="密码"
+                  placeholder="请输入登录密码"
+                  rules={[{ required: true, message: '请输入登录密码' }]}
+                  fieldProps={{
+                    size: 'large',
+                    prefix: <LockOutlined className="login-field-icon" />,
+                    autoComplete: 'current-password',
+                  }}
+                />
+                <ProForm.Item
+                  name="captchaCode"
+                  label="验证码"
+                  rules={[{ required: true, message: '请输入验证码' }]}
+                >
+                  <CaptchaInput
+                    captcha={captcha}
+                    loading={captchaLoading}
+                    onRefresh={refreshCaptcha}
+                  />
+                </ProForm.Item>
+                <div className="login-card__security">
+                  <span>
+                    <SafetyCertificateOutlined /> JWT 安全鉴权
+                  </span>
+                  <span>图形验证码 · 2 分钟有效</span>
+                </div>
+              </ProForm>
+            </div>
 
             <div className="login-demo">
               <div className="login-demo__head">

@@ -1,4 +1,14 @@
-import type { PageResult, PermissionNode, Role, RoleOption, RoleQuery, SaveRoleParams } from '@/types';
+import type {
+  PageResult,
+  PermissionNode,
+  Role,
+  RoleOption,
+  RoleQuery,
+  RoleUserOption,
+  SaveRoleParams,
+  UpdateRoleMembersParams,
+  UpdateRoleMembersResult,
+} from '@/types';
 import { http } from '@/utils/request';
 
 export function queryRoles(params: RoleQuery) {
@@ -23,4 +33,15 @@ export function updateRole(id: number, data: SaveRoleParams) {
 
 export function deleteRole(id: number) {
   return http.delete<{ success: boolean }>(`/system/roles/${id}`);
+}
+
+export function getRoleMemberUserOptions(
+  roleId: number,
+  params?: { keyword?: string; limit?: number },
+) {
+  return http.get<RoleUserOption[]>(`/system/roles/${roleId}/user-options`, params);
+}
+
+export function updateRoleMembers(roleId: number, data: UpdateRoleMembersParams) {
+  return http.post<UpdateRoleMembersResult>(`/system/roles/${roleId}/members`, data);
 }

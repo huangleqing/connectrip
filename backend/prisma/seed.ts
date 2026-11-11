@@ -2,6 +2,7 @@ import { PrismaClient, UserStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import {
   ALL_PERMISSION_CODES,
+  OPERATION_LINE_PERMISSION_CODES,
   PERMISSION_DEFINITIONS,
   PERMISSIONS,
 } from '../src/common/constants/permissions';
@@ -177,12 +178,13 @@ const seedRoles = [
   {
     code: 'operator',
     name: '运营专员',
-    description: '负责日常运营操作，可访问操作中心并查看登录用户列表。',
+    description: '负责日常运营操作，可访问操作中心全部线路并查看登录用户列表，金额默认隐藏。',
     isSystem: false,
     permissions: [
       PERMISSIONS.OPERATION_VIEW,
       PERMISSIONS.OPERATION_EXPORT,
       PERMISSIONS.USER_VIEW,
+      ...OPERATION_LINE_PERMISSION_CODES,
     ],
   },
   {
@@ -195,9 +197,13 @@ const seedRoles = [
   {
     code: 'dispatcher',
     name: '计调专员',
-    description: '负责旅行团计调工作，当前仅开放操作中心查看权限。',
+    description: '负责旅行团计调工作，可查看操作中心全部线路及金额，不可导出 Excel。',
     isSystem: false,
-    permissions: [PERMISSIONS.OPERATION_VIEW],
+    permissions: [
+      PERMISSIONS.OPERATION_VIEW,
+      PERMISSIONS.OPERATION_AMOUNT_VIEW,
+      ...OPERATION_LINE_PERMISSION_CODES,
+    ],
   },
 ];
 

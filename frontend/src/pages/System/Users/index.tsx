@@ -3,7 +3,7 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ModalForm, PageContainer, ProForm, ProFormSelect, ProFormText, ProTable } from '@ant-design/pro-components';
 import { Access, useAccess, useModel } from '@umijs/max';
 import { useRequest } from 'ahooks';
-import { App, Button, Popconfirm, Switch, Tag, Tooltip } from 'antd';
+import { Alert, App, Button, Popconfirm, Switch, Tag, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import { useRef, useState } from 'react';
 import UserAvatar from '@/components/UserAvatar';
@@ -115,7 +115,7 @@ export default function UsersPage() {
     if (!resetTarget) return false;
     try {
       await runResetPassword(resetTarget.id, values.password);
-      message.success(`已重置 ${resetTarget.nickname} 的密码`);
+      message.success(`已修改 ${resetTarget.nickname} 的登录密码`);
       return true;
     } catch {
       return false;
@@ -278,7 +278,7 @@ export default function UsersPage() {
       title: '操作',
       valueType: 'option',
       key: 'action',
-      width: 190,
+      width: 220,
       fixed: 'right',
       hideInTable: !canManageUsers,
       render: (_, record) => (
@@ -292,8 +292,8 @@ export default function UsersPage() {
             accessible={access.hasPermission(PERMISSIONS.USER_RESET_PASSWORD)}
             fallback={null}
           >
-            <a onClick={() => setResetTarget(record)} title="重置密码">
-              <KeyOutlined /> 重置
+            <a onClick={() => setResetTarget(record)} title="修改登录密码">
+              <KeyOutlined /> 修改密码
             </a>
           </Access>
           <Access
@@ -335,7 +335,7 @@ export default function UsersPage() {
         cardBordered={false}
         search={{ labelWidth: 'auto', defaultCollapsed: false }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
-        scroll={canManageUsers ? { x: 1060 } : undefined}
+        scroll={canManageUsers ? { x: 1090 } : undefined}
         options={{ reload: true, density: false, setting: false, fullScreen: false }}
         toolBarRender={() => [
           <Access
@@ -462,20 +462,26 @@ export default function UsersPage() {
 
       <ModalForm<ResetPasswordValues>
         key={`reset-${resetTarget?.id ?? 'none'}`}
-        title={`重置密码 · ${resetTarget?.nickname ?? ''}`}
+        title={`修改密码 · ${resetTarget?.nickname ?? ''}`}
         open={Boolean(resetTarget)}
         onOpenChange={(open) => {
           if (!open) setResetTarget(null);
         }}
-        width={460}
+        width={480}
         layout="vertical"
         modalProps={{ destroyOnHidden: true, maskClosable: false }}
         submitter={{
-          searchConfig: { submitText: '确认重置' },
+          searchConfig: { submitText: '保存新密码' },
           submitButtonProps: { loading: resetting },
         }}
         onFinish={handleResetPassword}
       >
+        <Alert
+          type="info"
+          showIcon
+          message="密码使用 bcrypt 单向哈希存储，无法查看原文；超级管理员只能为用户设置新密码。"
+          style={{ marginBottom: 16 }}
+        />
         <ProFormText.Password
           name="password"
           label="新密码"

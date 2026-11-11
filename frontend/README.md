@@ -1,6 +1,6 @@
 # GD旅游社管理系统
 
-面向旅游社的 RBAC 管理端，基于 **Umi 4 + Ant Design 5 + Pro Components** 搭建。包含登录鉴权、动态菜单、按钮级权限、用户管理、角色管理与预留的「操作中心」业务模块。
+面向旅游社的 RBAC 管理端，基于 **Umi 4 + Ant Design 5 + Pro Components** 搭建。包含登录鉴权、动态菜单、按钮级权限、用户管理、角色管理与「操作中心」业务模块。
 
 本目录是仓库的前端工程（`frontend/`），后端位于 [backend/](../backend/)，接口契约位于 [docs/backend-integration.md](../docs/backend-integration.md)。
 
@@ -12,6 +12,7 @@
 | 页面组件 | Ant Design 5 + `@ant-design/pro-components` 2 |
 | 权限控制 | Umi access 插件（Umi 4 内置） |
 | 异步请求 | ahooks `useRequest` + axios |
+| Excel 导出 | SheetJS `xlsx`（动态加载） |
 | 登录鉴权 | JWT（Bearer Token） |
 | 语言 | TypeScript |
 | 配套后端 | NestJS + Prisma + MySQL（接口契约见 [backend-integration.md](../docs/backend-integration.md)） |
@@ -53,16 +54,20 @@ npm run preview     # 预览生产构建
 
 ## 功能清单
 
-- 登录 / 退出登录，JWT 自动注入与失效回跳
+- 登录 / 退出登录，图形验证码校验，JWT 自动注入与失效回跳；支持当前用户修改登录密码
 - `initialState` 保存当前用户、角色、权限列表
 - 登录后按后端权限动态生成侧边菜单，无权限路由不渲染菜单
 - 路由级权限校验，直接访问无权限页面展示 403
 - 按钮级权限控制，统一使用 `<Access>` 组件
 - 用户管理：搜索、分页、新建、编辑、启停、重置密码、删除
-- 角色管理：权限树分配、新建、编辑、查看、删除，内置角色保护
+- 角色管理：权限树分配、新建、编辑、查看、删除、当前角色的批量成员添加/移除（支持多用户），内置角色保护；支持按线路/国家、Excel 导出、金额查看逐项授权
 - 工作台：用户/角色/权限概览、最近登录、快捷入口
-- 操作中心：业务模块占位，路由、菜单、按钮权限已预埋
+- 操作中心 → 操作中控台：按线路/国家、出团日期、团队状态和关键词筛选；今日/明日出团/送团统计；团队列表展示订单编号、团号、航班、客源、组团社、人数、负责人及 9 项操作进度；支持导出 Excel
+- 团队操作详情：行程表格、转包地接、酒店安排、餐厅安排、车队安排与其他操作（机票、签证、景点、演出、区间交通）六个页签，支持成本编辑、安排确认与单页 Excel 导出
+- 金额权限：角色勾选「查看操作金额」后才展示金额；未勾选时页面和导出文件统一显示 `****`
 - 开发 Mock 与真实 NestJS 后端一键切换
+
+> 操作中控台当前使用 [data.ts](src/pages/OperationCenter/data.ts) 中的前端样例数据，页面内的修改保存在当前会话；接入 NestJS 操作接口后可替换为持久化数据。角色权限已控制前端线路筛选与金额展示；接入真实操作接口后，后端仍需按 `operation:line:*` 过滤团队，并在响应中脱敏未授权金额。
 
 ## RBAC 设计
 
@@ -73,7 +78,9 @@ npm run preview     # 预览生产构建
 | 权限标识 | 说明 |
 | --- | --- |
 | `operation:view` | 查看操作中心 |
-| `operation:export` | 导出操作数据 |
+| `operation:export` | 导出操作数据（Excel） |
+| `operation:amount:view` | 查看操作金额；未授权时显示 `****` |
+| `operation:line:<line>` | 线路 / 国家数据权限（17 个线路标签，角色管理中勾选） |
 | `system:user:view` | 查看用户列表 |
 | `system:user:create` | 新增用户 |
 | `system:user:update` | 编辑用户 / 启停账号 |
@@ -87,9 +94,9 @@ npm run preview     # 预览生产构建
 内置角色：
 
 - `super_admin` 超级管理员：拥有全部权限，系统内置，不可编辑或删除
-- `operator` 运营专员：操作中心 + 用户列表只读
+- `operator` 运营专员：操作中心全部线路 + Excel 导出 + 用户列表只读，金额默认隐藏
 - `viewer` 只读访客：无业务菜单
-- `dispatcher` 计调专员：仅操作中心查看
+- `dispatcher` 计调专员：操作中心全部线路 + 金额查看，无 Excel 导出权限
 
 ### 权限流转
 
@@ -204,7 +211,7 @@ npx cross-env MOCK=none API_PROXY_TARGET=http://localhost:3000 npm run dev
 │   ├── pages/
 │   │   ├── Login/
 │   │   ├── Dashboard/
-│   │   ├── OperationCenter/   # 业务模块预留
+│   │   ├── OperationCenter/   # 操作中控台 + 团队操作详情页签
 │   │   ├── System/Users/
 │   │   ├── System/Roles/
 │   │   └── Exception/
@@ -223,7 +230,9 @@ npx cross-env MOCK=none API_PROXY_TARGET=http://localhost:3000 npm run dev
 - **菜单与按钮双控**：例如运营专员能看到「用户管理」菜单，但看不到「新建用户」和行内编辑按钮。
 - **内置角色保护**：超级管理员角色不可编辑/删除；超级管理员账号不可停用/删除；当前登录账号不可修改自身角色和状态。
 - **角色权限刷新**：角色保存后会刷新当前用户的 `initialState`，确保权限变化及时生效；其他在线用户需重新登录或刷新页面。
-- **操作中心**：目前为预留页面，已接入动态菜单与 `operation:export` 按钮权限，后续直接替换页面内容即可扩展业务。
+- **操作中心**：`/operation-center` 承载「操作中控台」，团队操作详情采用抽屉 + 页签承载。行程、转包地接、酒店、餐厅、车队等子页面按《中控台》需求文档落地；导出按钮受 `operation:export` 控制，主控台与详情页均导出 `.xlsx` 文件。
+- **线路权限**：`operation:line:*` 由角色管理分配，未授权的线路标签不会出现在中控台，列表和导出也只包含已授权线路。
+- **金额权限**：`operation:amount:view` 控制详情页及 Excel 中的金额；未授权时页面显示 `****`，导出文件中的金额列同样脱敏。
 
 ## 生产部署
 

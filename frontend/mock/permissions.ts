@@ -1,6 +1,26 @@
 export const PERMISSION_CODES = {
   OPERATION_VIEW: 'operation:view',
   OPERATION_EXPORT: 'operation:export',
+  OPERATION_AMOUNT_VIEW: 'operation:amount:view',
+
+  OPERATION_LINE_TICKET: 'operation:line:ticket',
+  OPERATION_LINE_CHONGQING: 'operation:line:chongqing',
+  OPERATION_LINE_LAOS: 'operation:line:laos',
+  OPERATION_LINE_VIETNAM: 'operation:line:vietnam',
+  OPERATION_LINE_THAILAND: 'operation:line:thailand',
+  OPERATION_LINE_FRANCE: 'operation:line:france',
+  OPERATION_LINE_SINGAPORE: 'operation:line:singapore',
+  OPERATION_LINE_UAE: 'operation:line:uae',
+  OPERATION_LINE_MALAYSIA: 'operation:line:malaysia',
+  OPERATION_LINE_MONGOLIA: 'operation:line:mongolia',
+  OPERATION_LINE_PERSONAL: 'operation:line:personal',
+  OPERATION_LINE_TAIWAN: 'operation:line:taiwan',
+  OPERATION_LINE_MYANMAR: 'operation:line:myanmar',
+  OPERATION_LINE_UK: 'operation:line:uk',
+  OPERATION_LINE_BRUNEI: 'operation:line:brunei',
+  OPERATION_LINE_CANADA: 'operation:line:canada',
+  OPERATION_LINE_ITALY: 'operation:line:italy',
+
   USER_VIEW: 'system:user:view',
   USER_CREATE: 'system:user:create',
   USER_UPDATE: 'system:user:update',
@@ -12,6 +32,26 @@ export const PERMISSION_CODES = {
   ROLE_DELETE: 'system:role:delete',
 } as const;
 
+export const OPERATION_LINE_PERMISSION_CODES: string[] = [
+  PERMISSION_CODES.OPERATION_LINE_TICKET,
+  PERMISSION_CODES.OPERATION_LINE_CHONGQING,
+  PERMISSION_CODES.OPERATION_LINE_LAOS,
+  PERMISSION_CODES.OPERATION_LINE_VIETNAM,
+  PERMISSION_CODES.OPERATION_LINE_THAILAND,
+  PERMISSION_CODES.OPERATION_LINE_FRANCE,
+  PERMISSION_CODES.OPERATION_LINE_SINGAPORE,
+  PERMISSION_CODES.OPERATION_LINE_UAE,
+  PERMISSION_CODES.OPERATION_LINE_MALAYSIA,
+  PERMISSION_CODES.OPERATION_LINE_MONGOLIA,
+  PERMISSION_CODES.OPERATION_LINE_PERSONAL,
+  PERMISSION_CODES.OPERATION_LINE_TAIWAN,
+  PERMISSION_CODES.OPERATION_LINE_MYANMAR,
+  PERMISSION_CODES.OPERATION_LINE_UK,
+  PERMISSION_CODES.OPERATION_LINE_BRUNEI,
+  PERMISSION_CODES.OPERATION_LINE_CANADA,
+  PERMISSION_CODES.OPERATION_LINE_ITALY,
+];
+
 export const ALL_PERMISSION_CODES: string[] = Object.values(PERMISSION_CODES);
 
 export const permissionTree = [
@@ -21,7 +61,32 @@ export const permissionTree = [
     type: 'group',
     children: [
       { key: PERMISSION_CODES.OPERATION_VIEW, title: '查看操作中心', type: 'menu' },
-      { key: PERMISSION_CODES.OPERATION_EXPORT, title: '导出操作数据', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_EXPORT, title: '导出操作数据（Excel）', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_AMOUNT_VIEW, title: '查看操作金额', type: 'button' },
+    ],
+  },
+  {
+    key: 'group:operation-line',
+    title: '线路 / 国家权限',
+    type: 'group',
+    children: [
+      { key: PERMISSION_CODES.OPERATION_LINE_TICKET, title: '票务', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_CHONGQING, title: '重庆', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_LAOS, title: '老挝-LAO', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_VIETNAM, title: '越南-VNM', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_THAILAND, title: '泰国-THA', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_FRANCE, title: '法国-FRA', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_SINGAPORE, title: '新加坡-SIN', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_UAE, title: '阿联酋-UAE', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_MALAYSIA, title: '马来西亚-MYS', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_MONGOLIA, title: '蒙古国-MNG', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_PERSONAL, title: '个人业务-PB', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_TAIWAN, title: '中国台湾', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_MYANMAR, title: 'MYA-缅甸', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_UK, title: '英国-UK', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_BRUNEI, title: '文莱-BN', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_CANADA, title: '加拿大-CA', type: 'button' },
+      { key: PERMISSION_CODES.OPERATION_LINE_ITALY, title: '意大利-ITA', type: 'button' },
     ],
   },
   {

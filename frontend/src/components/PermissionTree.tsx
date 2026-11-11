@@ -1,6 +1,7 @@
 import { Spin, Tag, Tree } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import type { Key } from 'react';
+import { PERMISSIONS } from '@/constants/permissions';
 import type { PermissionNode } from '@/types';
 
 interface PermissionTreeProps {
@@ -10,6 +11,13 @@ interface PermissionTreeProps {
   disabled?: boolean;
   loading?: boolean;
   className?: string;
+}
+
+function isDataScope(permissionCode: string) {
+  return (
+    permissionCode.startsWith('operation:line:') ||
+    permissionCode === PERMISSIONS.OPERATION_AMOUNT_VIEW
+  );
 }
 
 function toTreeData(nodes: PermissionNode[]): DataNode[] {
@@ -29,11 +37,15 @@ function toTreeData(nodes: PermissionNode[]): DataNode[] {
       title: (
         <span className="permission-tree__leaf">
           {node.title}
-          {node.type === 'button' && (
+          {isDataScope(node.key) ? (
+            <Tag bordered={false} className="permission-tree__tag permission-tree__tag--data">
+              数据
+            </Tag>
+          ) : node.type === 'button' ? (
             <Tag bordered={false} className="permission-tree__tag">
               按钮
             </Tag>
-          )}
+          ) : null}
         </span>
       ),
     };

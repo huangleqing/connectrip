@@ -14,3 +14,23 @@ export interface RoleOptionDto {
   value: number;
   code: string;
 }
+
+export interface RoleUserOptionDto {
+  id: number;
+  username: string;
+  nickname: string;
+  status: 'active' | 'disabled';
+  isMember: boolean;
+  roles: Array<{
+    id: number;
+    code: string;
+    name: string;
+  }>;
+}
+
+export interface UpdateRoleMembersResultDto {
+  success: boolean;
+  action: 'add' | 'remove';
+  affected: number;
+  userCount: number;
+}

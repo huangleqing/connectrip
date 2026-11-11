@@ -58,6 +58,27 @@ export interface RoleOption {
   code: string;
 }
 
+export interface RoleUserOption {
+  id: number;
+  username: string;
+  nickname: string;
+  status: UserStatus;
+  isMember: boolean;
+  roles: RoleBrief[];
+}
+
+export interface UpdateRoleMembersParams {
+  action: 'add' | 'remove';
+  userIds: number[];
+}
+
+export interface UpdateRoleMembersResult {
+  success: boolean;
+  action: 'add' | 'remove';
+  affected: number;
+  userCount: number;
+}
+
 export interface PageQuery {
   page: number;
   pageSize: number;
@@ -73,6 +94,19 @@ export interface PageResult<T> {
 export interface LoginParams {
   username: string;
   password: string;
+  captchaId: string;
+  captchaCode: string;
+}
+
+export interface CaptchaResult {
+  captchaId: string;
+  image: string;
+  expiresIn: number;
+}
+
+export interface ChangePasswordParams {
+  oldPassword: string;
+  newPassword: string;
 }
 
 export interface LoginResult {

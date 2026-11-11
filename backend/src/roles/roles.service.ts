@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,11 +11,21 @@ import {
   buildPermissionTree,
   type PermissionCode,
 } from '../common/constants/permissions';
+import { SUPER_ADMIN_ROLE_CODE } from '../common/constants/roles';
+import { toApiUserStatus } from '../common/constants/user-status';
+import type { AuthUser } from '../common/types/auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateRoleDto } from './dto/create-role.dto';
 import type { RoleQueryDto } from './dto/role-query.dto';
+import type { RoleUserOptionsQueryDto } from './dto/role-user-options-query.dto';
 import type { UpdateRoleDto } from './dto/update-role.dto';
-import type { RoleDto, RoleOptionDto } from './roles.types';
+import type { UpdateRoleMembersDto } from './dto/update-role-members.dto';
+import type {
+  RoleDto,
+  RoleOptionDto,
+  RoleUserOptionDto,
+  UpdateRoleMembersResultDto,
+} from './roles.types';
 
 const roleDetailInclude = Prisma.validator<Prisma.RoleInclude>()({
   permissions: {
@@ -103,6 +114,117 @@ export class RolesService {
 
   getPermissionTree() {
     return buildPermissionTree();
+  }
+
+  async getUserOptions(
+    roleId: number,
+    query: RoleUserOptionsQueryDto,
+  ): Promise<RoleUserOptionDto[]> {
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      select: { id: true },
+    });
+    if (!role) {
+      throw new NotFoundException('角色不存在');
+    }
+
+    const keyword = query.keyword?.trim();
+    const users = await this.prisma.user.findMany({
+      where: keyword
+        ? {
+            OR: [
+              { username: { contains: keyword } },
+              { nickname: { contains: keyword } },
+            ],
+          }
+        : {},
+      select: {
+        id: true,
+        username: true,
+        nickname: true,
+        status: true,
+        roles: {
+          select: {
+            role: {
+              select: { id: true, code: true, name: true },
+            },
+          },
+        },
+      },
+      orderBy: { id: 'asc' },
+      take: query.limit ?? 200,
+    });
+
+    return users.map((user) => {
+      const roles = user.roles
+        .map((userRole) => userRole.role)
+        .sort((left, right) => left.id - right.id);
+      return {
+        id: user.id,
+        username: user.username,
+        nickname: user.nickname,
+        status: toApiUserStatus(user.status),
+        isMember: roles.some((item) => item.id === roleId),
+        roles,
+      };
+    });
+  }
+
+  async updateMembers(
+    roleId: number,
+    dto: UpdateRoleMembersDto,
+    currentUser: AuthUser,
+  ): Promise<UpdateRoleMembersResultDto> {
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      select: { id: true, code: true },
+    });
+    if (!role) {
+      throw new NotFoundException('角色不存在');
+    }
+
+    if (role.code === SUPER_ADMIN_ROLE_CODE && !currentUser.isSuperAdmin) {
+      throw new ForbiddenException('只有超级管理员可以管理超级管理员角色成员');
+    }
+    if (role.code === SUPER_ADMIN_ROLE_CODE && dto.action === 'remove') {
+      throw new BadRequestException('不能批量移除超级管理员角色');
+    }
+
+    const userIds = Array.from(new Set(dto.userIds));
+    const existingUserCount = await this.prisma.user.count({
+      where: { id: { in: userIds } },
+    });
+    if (existingUserCount !== userIds.length) {
+      throw new BadRequestException('部分用户不存在，请刷新后重试');
+    }
+
+    let affected = 0;
+    if (dto.action === 'add') {
+      const result = await this.prisma.userRole.createMany({
+        data: userIds.map((userId) => ({ roleId, userId })),
+        skipDuplicates: true,
+      });
+      affected = result.count;
+    } else {
+      const result = await this.prisma.userRole.deleteMany({
+        where: {
+          roleId,
+          userId: { in: userIds },
+        },
+      });
+      affected = result.count;
+    }
+
+    const userCount = await this.prisma.userRole.count({
+      where: { roleId },
+    });
+
+    return {
+      success: true,
+      action: dto.action,
+      affected,
+      userCount,
+    };
   }
 
   async create(dto: CreateRoleDto) {

@@ -10,4 +10,13 @@ export class LoginDto {
   @IsNotEmpty({ message: '请输入密码' })
   @MaxLength(64, { message: '密码长度不能超过 64 个字符' })
   password: string;
+
+  @IsString({ message: '验证码标识必须为字符串' })
+  @IsNotEmpty({ message: '请刷新验证码' })
+  captchaId: string;
+
+  @IsString({ message: '请输入验证码' })
+  @IsNotEmpty({ message: '请输入验证码' })
+  @MaxLength(10, { message: '验证码格式不正确' })
+  captchaCode: string;
 }

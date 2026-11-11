@@ -5,19 +5,35 @@ import {
   PlusOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
-import type { ActionType, ProColumns } from '@ant-design/pro-components';
+import type {
+  ActionType,
+  ProColumns,
+  ProFormInstance,
+} from '@ant-design/pro-components';
 import {
   ModalForm,
   PageContainer,
   ProForm,
+  ProFormSelect,
   ProFormText,
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
 import { Access, useAccess, useModel } from '@umijs/max';
 import { useRequest } from 'ahooks';
-import { App, Button, Descriptions, Drawer, Popconfirm, Tag, Tooltip } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  Descriptions,
+  Drawer,
+  Popconfirm,
+  Segmented,
+  Tag,
+  Tooltip,
+} from 'antd';
 import dayjs from 'dayjs';
 import { useRef, useState } from 'react';
 import PermissionTree from '@/components/PermissionTree';
@@ -27,8 +43,10 @@ import {
   createRole,
   deleteRole,
   getPermissionTree,
+  getRoleMemberUserOptions,
   queryRoles,
   updateRole,
+  updateRoleMembers,
 } from '@/services/role';
 import type { Role, RoleQuery } from '@/types';
 import './index.less';
@@ -46,21 +64,51 @@ interface RoleModalState {
   record?: Role;
 }
 
+interface MemberActionFormValues {
+  action: 'add' | 'remove';
+  userIds: number[];
+}
+
 export default function RolesPage() {
   const access = useAccess();
   const { message } = App.useApp();
-  const { refresh } = useModel('@@initialState');
+  const { initialState, refresh } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
 
   const actionRef = useRef<ActionType>();
   const tableRequest = useTableRequest<Role, RoleQuery>(queryRoles);
 
   const [roleModal, setRoleModal] = useState<RoleModalState>({ open: false, mode: 'create' });
   const [viewRole, setViewRole] = useState<Role | null>(null);
+  const [memberRole, setMemberRole] = useState<Role | null>(null);
+  const [memberAction, setMemberAction] = useState<'add' | 'remove'>('add');
+  const memberFormRef = useRef<ProFormInstance<MemberActionFormValues>>();
 
   const { data: permissionTree, loading: permissionLoading } = useRequest(getPermissionTree);
   const { runAsync: runCreate, loading: creating } = useRequest(createRole, { manual: true });
   const { runAsync: runUpdate, loading: updating } = useRequest(updateRole, { manual: true });
   const { runAsync: runDelete } = useRequest(deleteRole, { manual: true });
+  const {
+    data: memberUserOptions,
+    loading: memberOptionsLoading,
+    runAsync: loadMemberUserOptions,
+  } = useRequest(getRoleMemberUserOptions, { manual: true });
+  const { runAsync: runUpdateMembers, loading: updatingMembers } = useRequest(
+    updateRoleMembers,
+    { manual: true },
+  );
+
+  const memberOptions = (memberUserOptions ?? [])
+    .filter((user) => (memberAction === 'add' ? !user.isMember : user.isMember))
+    .map((user) => {
+      const roleNames = user.roles.map((role) => role.name).join('、');
+      return {
+        label: `${user.nickname}（@${user.username}）${
+          user.status === 'disabled' ? ' · 已停用' : ''
+        }${roleNames ? ` · 当前角色：${roleNames}` : ' · 暂无角色'}`,
+        value: user.id,
+      };
+    });
 
   const openCreateModal = () => {
     setRoleModal({ open: true, mode: 'create' });
@@ -68,6 +116,49 @@ export default function RolesPage() {
 
   const openEditModal = (record: Role) => {
     setRoleModal({ open: true, mode: 'edit', record });
+  };
+
+  const openMembersModal = (record: Role) => {
+    setMemberAction('add');
+    setMemberRole(record);
+    loadMemberUserOptions(record.id).catch(() => {
+      // 错误提示由请求层统一处理
+    });
+  };
+
+  const handleMemberValuesChange = (changed: Partial<MemberActionFormValues>) => {
+    if (changed.action !== undefined) {
+      setMemberAction(changed.action);
+      memberFormRef.current?.setFieldsValue({ userIds: [] });
+    }
+  };
+
+  const handleMembers = async (values: MemberActionFormValues) => {
+    if (!memberRole) return false;
+    try {
+      const result = await runUpdateMembers(memberRole.id, {
+        action: values.action,
+        userIds: values.userIds,
+      });
+      if (result.affected > 0) {
+        message.success(
+          result.action === 'add'
+            ? `已为 ${result.affected} 位用户添加「${memberRole.name}」角色`
+            : `已从「${memberRole.name}」移除 ${result.affected} 位用户`,
+        );
+      } else {
+        message.info(
+          result.action === 'add'
+            ? '所选用户已拥有该角色'
+            : '所选用户不属于该角色',
+        );
+      }
+      actionRef.current?.reload();
+      refresh();
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const handleFinish = async (values: RoleFormValues) => {
@@ -191,7 +282,7 @@ export default function RolesPage() {
       title: '操作',
       valueType: 'option',
       key: 'action',
-      width: 200,
+      width: 260,
       fixed: 'right',
       render: (_, record) => {
         const editLink = (
@@ -219,6 +310,23 @@ export default function RolesPage() {
             <a onClick={() => setViewRole(record)}>
               <EyeOutlined /> 查看
             </a>
+
+            {record.isSystem && !currentUser?.isSuperAdmin ? (
+              <Tooltip title="只有超级管理员可以管理超级管理员角色成员">
+                <span className="role-action-disabled">
+                  <UserAddOutlined /> 成员管理
+                </span>
+              </Tooltip>
+            ) : (
+              <Access
+                accessible={access.hasPermission(PERMISSIONS.ROLE_UPDATE)}
+                fallback={null}
+              >
+                <a onClick={() => openMembersModal(record)}>
+                  <UserAddOutlined /> 成员管理
+                </a>
+              </Access>
+            )}
 
             {record.isSystem ? (
               <Tooltip title="系统内置角色，不可编辑">
@@ -274,7 +382,7 @@ export default function RolesPage() {
         search={{ labelWidth: 'auto', defaultCollapsed: false }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
         options={{ reload: true, density: false, setting: false, fullScreen: false }}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1080 }}
         toolBarRender={() => [
           <Access
             key="create"
@@ -355,7 +463,9 @@ export default function RolesPage() {
           label={
             <span className="role-permission-label">
               权限配置
-              <span>勾选父级可批量授权，菜单与按钮权限均来自后端权限树</span>
+              <span>
+                勾选父级可批量授权；菜单、按钮、线路与金额权限均来自后端权限树，未勾选「查看操作金额」时金额显示 ****
+              </span>
             </span>
           }
           rules={[
@@ -369,6 +479,114 @@ export default function RolesPage() {
         >
           <PermissionTree treeData={permissionTree ?? []} loading={permissionLoading} />
         </ProForm.Item>
+      </ModalForm>
+
+      <ModalForm<MemberActionFormValues>
+        key={`members-${memberRole?.id ?? 'none'}`}
+        formRef={memberFormRef}
+        title={memberRole ? `成员管理 · ${memberRole.name}` : '成员管理'}
+        open={Boolean(memberRole)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMemberRole(null);
+            setMemberAction('add');
+          }
+        }}
+        width={640}
+        layout="vertical"
+        initialValues={{ action: 'add', userIds: [] }}
+        modalProps={{ destroyOnHidden: true, maskClosable: false }}
+        onValuesChange={handleMemberValuesChange}
+        submitter={{
+          searchConfig: {
+            submitText: memberAction === 'add' ? '批量添加' : '批量移除',
+          },
+          submitButtonProps: {
+            loading: updatingMembers,
+            danger: memberAction === 'remove',
+            disabled:
+              memberOptionsLoading ||
+              memberOptions.length === 0 ||
+              (memberAction === 'remove' && memberRole?.code === 'super_admin'),
+          },
+        }}
+        onFinish={handleMembers}
+      >
+        <Alert
+          type={memberAction === 'add' ? 'info' : 'warning'}
+          showIcon
+          message={
+            memberAction === 'add'
+              ? `只会把用户加入「${memberRole?.name ?? ''}」，不会影响用户已有的其他角色。`
+              : `只会把用户从「${memberRole?.name ?? ''}」移除，不会删除用户或其他角色。`
+          }
+          style={{ marginBottom: 16 }}
+        />
+
+        <ProForm.Item name="action" label="操作类型">
+          <Segmented
+            block
+            options={[
+              { label: '添加成员', value: 'add' },
+              {
+                label: '移除成员',
+                value: 'remove',
+                disabled: memberRole?.code === 'super_admin',
+              },
+            ]}
+          />
+        </ProForm.Item>
+
+        <ProFormSelect
+          name="userIds"
+          label={
+            memberRole
+              ? `选择用户（该角色当前已有 ${memberRole.userCount} 位成员）`
+              : '选择用户'
+          }
+          placeholder={
+            memberAction === 'add'
+              ? '搜索并选择要添加的用户'
+              : '搜索并选择要移除的用户'
+          }
+          options={memberOptions}
+          rules={[
+            {
+              required: true,
+              type: 'array',
+              min: 1,
+              message: '请至少选择一个用户',
+            },
+          ]}
+          fieldProps={{
+            mode: 'multiple',
+            showSearch: true,
+            optionFilterProp: 'label',
+            maxTagCount: 'responsive',
+            loading: memberOptionsLoading,
+            disabled: memberOptionsLoading,
+          }}
+        />
+
+        {memberRole?.code === 'super_admin' && (
+          <Alert
+            type="info"
+            showIcon
+            message="超级管理员角色不允许批量移除成员，仅支持添加。"
+          />
+        )}
+
+        {!memberOptionsLoading && memberOptions.length === 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            message={
+              memberAction === 'add'
+                ? '所有用户都已加入该角色。'
+                : '该角色暂无成员。'
+            }
+          />
+        )}
       </ModalForm>
 
       <Drawer

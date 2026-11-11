@@ -1,4 +1,8 @@
-import { ALL_PERMISSION_CODES, PERMISSION_CODES } from './permissions';
+import {
+  ALL_PERMISSION_CODES,
+  OPERATION_LINE_PERMISSION_CODES,
+  PERMISSION_CODES,
+} from './permissions';
 
 export type MockUserStatus = 'active' | 'disabled';
 
@@ -52,11 +56,12 @@ export const roles: MockRole[] = [
     id: 2,
     name: '运营专员',
     code: 'operator',
-    description: '负责日常运营操作，可访问操作中心并查看登录用户列表。',
+    description: '负责日常运营操作，可访问操作中心全部线路并查看登录用户列表，金额默认隐藏。',
     permissions: [
       PERMISSION_CODES.OPERATION_VIEW,
       PERMISSION_CODES.OPERATION_EXPORT,
       PERMISSION_CODES.USER_VIEW,
+      ...OPERATION_LINE_PERMISSION_CODES,
     ],
     isSystem: false,
     createdAt: daysAgo(300),
@@ -74,8 +79,12 @@ export const roles: MockRole[] = [
     id: 4,
     name: '计调专员',
     code: 'dispatcher',
-    description: '负责旅行团计调工作，当前仅开放操作中心查看权限。',
-    permissions: [PERMISSION_CODES.OPERATION_VIEW],
+    description: '负责旅行团计调工作，可查看操作中心全部线路及金额，不可导出 Excel。',
+    permissions: [
+      PERMISSION_CODES.OPERATION_VIEW,
+      PERMISSION_CODES.OPERATION_AMOUNT_VIEW,
+      ...OPERATION_LINE_PERMISSION_CODES,
+    ],
     isSystem: false,
     createdAt: daysAgo(96),
   },
