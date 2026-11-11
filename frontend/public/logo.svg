@@ -1,0 +1,19 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gd-brand" x1="8" y1="6" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="0.55" stop-color="#1677FF"/>
+      <stop offset="1" stop-color="#0B4EA2"/>
+    </linearGradient>
+    <linearGradient id="gd-plane" x1="22" y1="18" x2="46" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E0F2FE"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#gd-brand)"/>
+  <circle cx="50" cy="14" r="10" fill="#FFFFFF" fill-opacity="0.08"/>
+  <circle cx="13" cy="51" r="14" fill="#FFFFFF" fill-opacity="0.06"/>
+  <path d="M14.5 32.4L50 15.2L38.2 49.3L29.8 38.1L14.5 32.4Z" fill="url(#gd-plane)"/>
+  <path d="M29.8 38.1L50 15.2L34.8 35.4L29.8 38.1Z" fill="#BAE6FD"/>
+  <path d="M13 45.5C17.8 44.3 21.3 41.6 23.5 37.8" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="2" stroke-linecap="round" stroke-dasharray="1.5 5"/>
+</svg>
