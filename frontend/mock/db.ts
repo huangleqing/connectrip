@@ -32,6 +32,20 @@ export interface MockUser {
 
 const SUPER_ADMIN_CODE = 'super_admin';
 
+interface MockDatabaseState {
+  roles: MockRole[];
+  users: MockUser[];
+}
+
+/**
+ * Umi Mock 会为不同 mock 文件分别加载依赖，模块级变量可能产生多份副本。
+ * 把内存存储挂到 globalThis，确保 auth / roles / users 等接口共享同一份数据。
+ */
+const mockGlobal = globalThis as typeof globalThis & {
+  __GD_TRAVEL_MOCK_DATABASE__?: MockDatabaseState;
+};
+const existingDatabase = mockGlobal.__GD_TRAVEL_MOCK_DATABASE__;
+
 function daysAgo(days: number, hour = 9, minute = 30): string {
   const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   date.setHours(hour, minute, 0, 0);
@@ -42,7 +56,7 @@ function hoursAgo(hours: number): string {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
 
-export const roles: MockRole[] = [
+export const roles: MockRole[] = existingDatabase?.roles ?? [
   {
     id: 1,
     name: '超级管理员',
@@ -90,7 +104,7 @@ export const roles: MockRole[] = [
   },
 ];
 
-export const users: MockUser[] = [
+export const users: MockUser[] = existingDatabase?.users ?? [
   {
     id: 1,
     username: 'admin',
@@ -236,6 +250,10 @@ export const users: MockUser[] = [
     createdAt: daysAgo(18, 9),
   },
 ];
+
+if (!existingDatabase) {
+  mockGlobal.__GD_TRAVEL_MOCK_DATABASE__ = { roles, users };
+}
 
 export function findRoleById(id: number) {
   return roles.find((role) => role.id === id);

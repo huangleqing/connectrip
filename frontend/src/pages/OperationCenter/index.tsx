@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
-import { Access, useAccess } from '@umijs/max';
+import { Access, useAccess, useModel } from '@umijs/max';
 import {
   Alert,
   App,
@@ -89,9 +89,17 @@ function OperationBadge({
 
 export default function OperationCenterPage() {
   const access = useAccess();
+  const { refresh } = useModel('@@initialState');
   const { message } = App.useApp();
   const canExport = access.hasPermission(PERMISSIONS.OPERATION_EXPORT);
   const canViewAmount = access.hasPermission(PERMISSIONS.OPERATION_AMOUNT_VIEW);
+
+  // 角色权限可能已被管理员调整，进入操作中心时重新拉取当前账号权限。
+  useEffect(() => {
+    void refresh();
+    // 仅在进入页面时刷新一次，避免 initialState 更新触发重复请求
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [tours, setTours] = useState<TourGroup[]>(INITIAL_TOURS);
   const [country, setCountry] = useState('全部');
@@ -474,8 +482,11 @@ export default function OperationCenterPage() {
               <em>按目的地快速切换团队视图</em>
             </div>
             <span className="console-filter__tip">
-              已按角色开通 {accessibleCountryLabels.length - 1} 条线路
-              {canViewAmount ? '' : ' · 金额已隐藏'}
+              {access.isSuperAdmin
+                ? '超级管理员默认拥有全部线路与金额权限'
+                : `已按角色开通 ${accessibleCountryLabels.length - 1} 条线路${
+                    canViewAmount ? '' : ' · 金额已隐藏'
+                  }`}
             </span>
           </div>
           <div className="country-pills">

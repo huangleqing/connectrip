@@ -407,17 +407,17 @@ GET /api/system/permissions
       "children": [
         { "key": "operation:view", "title": "查看操作中心", "type": "menu" },
         { "key": "operation:export", "title": "导出操作数据（Excel）", "type": "button" },
-        { "key": "operation:amount:view", "title": "查看操作金额", "type": "button" }
-      ]
-    },
-    {
-      "key": "group:operation-line",
-      "title": "线路 / 国家权限",
-      "type": "group",
-      "children": [
-        { "key": "operation:line:laos", "title": "老挝-LAO", "type": "button" },
-        { "key": "operation:line:thailand", "title": "泰国-THA", "type": "button" },
-        { "key": "operation:line:malaysia", "title": "马来西亚-MYS", "type": "button" }
+        { "key": "operation:amount:view", "title": "查看操作金额", "type": "button" },
+        {
+          "key": "group:operation-line",
+          "title": "线路 / 国家权限",
+          "type": "group",
+          "children": [
+            { "key": "operation:line:laos", "title": "老挝-LAO", "type": "button" },
+            { "key": "operation:line:thailand", "title": "泰国-THA", "type": "button" },
+            { "key": "operation:line:malaysia", "title": "马来西亚-MYS", "type": "button" }
+          ]
+        }
       ]
     }
   ]

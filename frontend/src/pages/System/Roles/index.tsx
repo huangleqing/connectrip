@@ -176,7 +176,11 @@ export default function RolesPage() {
       } else if (roleModal.record) {
         await runUpdate(roleModal.record.id, payload);
       }
-      message.success(isCreate ? '角色创建成功' : '角色权限已更新');
+      message.success(
+        isCreate
+          ? '角色创建成功'
+          : '角色权限已更新；相关成员需刷新页面或重新登录后生效',
+      );
       actionRef.current?.reload();
       refresh();
       return true;
@@ -464,7 +468,7 @@ export default function RolesPage() {
             <span className="role-permission-label">
               权限配置
               <span>
-                勾选父级可批量授权；菜单、按钮、线路与金额权限均来自后端权限树，未勾选「查看操作金额」时金额显示 ****
+                勾选父级可批量授权；未勾选「查看操作金额」时金额显示 ****。保存后相关成员需刷新页面或重新登录，超级管理员始终拥有全部权限。
               </span>
             </span>
           }

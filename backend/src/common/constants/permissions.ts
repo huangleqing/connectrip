@@ -42,6 +42,9 @@ export interface PermissionDefinition {
   type: PermissionTypeValue;
   module: string;
   moduleTitle: string;
+  /** 可选的二级分组标识，用于把一组权限嵌套在所属模块下 */
+  subgroup?: string;
+  subgroupTitle?: string;
   sort: number;
 }
 
@@ -73,8 +76,10 @@ const OPERATION_LINE_DEFINITIONS: PermissionDefinition[] =
     code: item.code,
     name: item.name,
     type: 'BUTTON',
-    module: 'operation-line',
-    moduleTitle: '线路 / 国家权限',
+    module: 'operation',
+    moduleTitle: '操作中心',
+    subgroup: 'operation-line',
+    subgroupTitle: '线路 / 国家权限',
     sort: 100 + index,
   }));
 
@@ -209,7 +214,25 @@ export function buildPermissionTree(): PermissionTreeNode[] {
       modules.set(definition.module, group);
     }
 
-    group.children?.push({
+    let target = group;
+    if (definition.subgroup) {
+      const subgroupKey = `group:${definition.subgroup}`;
+      let subgroup = group.children?.find(
+        (child) => child.type === 'group' && child.key === subgroupKey,
+      );
+      if (!subgroup) {
+        subgroup = {
+          key: subgroupKey,
+          title: definition.subgroupTitle ?? definition.subgroup,
+          type: 'group',
+          children: [],
+        };
+        group.children?.push(subgroup);
+      }
+      target = subgroup;
+    }
+
+    target.children?.push({
       key: definition.code,
       title: definition.name,
       type: definition.type === 'MENU' ? 'menu' : 'button',
