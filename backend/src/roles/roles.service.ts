@@ -7,9 +7,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
-  ALL_PERMISSION_CODES,
   buildPermissionTree,
-  type PermissionCode,
+  type PermissionTreeNode,
 } from '../common/constants/permissions';
 import { SUPER_ADMIN_ROLE_CODE } from '../common/constants/roles';
 import { toApiUserStatus } from '../common/constants/user-status';
@@ -29,32 +28,58 @@ import type {
 
 const roleDetailInclude = Prisma.validator<Prisma.RoleInclude>()({
   permissions: {
+    where: { permission: { isDeleted: false } },
     include: {
       permission: true,
     },
   },
   _count: {
     select: {
-      users: true,
+      users: { where: { user: { isDeleted: false } } },
     },
   },
 });
+
+function filterPermissionTree(
+  nodes: PermissionTreeNode[],
+  deletedCodes: Set<string>,
+): PermissionTreeNode[] {
+  return nodes
+    .map((node) => {
+      if (node.children?.length) {
+        return {
+          ...node,
+          children: filterPermissionTree(node.children, deletedCodes),
+        };
+      }
+      return node;
+    })
+    .filter((node) =>
+      node.children
+        ? node.children.length > 0
+        : !deletedCodes.has(node.key),
+    );
+}
 
 type RoleWithRelations = Prisma.RoleGetPayload<{
   include: typeof roleDetailInclude;
 }>;
 
 function toRoleDto(role: RoleWithRelations): RoleDto {
-  const codes = new Set(
-    role.permissions.map((rolePermission) => rolePermission.permission.code),
-  );
+  const permissions = role.permissions
+    .map((rolePermission) => rolePermission.permission)
+    .sort(
+      (left, right) =>
+        left.sort - right.sort || left.code.localeCompare(right.code),
+    )
+    .map((permission) => permission.code);
 
   return {
     id: role.id,
     name: role.name,
     code: role.code,
     description: role.description,
-    permissions: ALL_PERMISSION_CODES.filter((code) => codes.has(code)),
+    permissions,
     userCount: role._count.users,
     isSystem: role.isSystem,
     createdAt: role.createdAt.toISOString(),
@@ -70,15 +95,18 @@ export class RolesService {
     const pageSize = query.pageSize ?? 10;
     const keyword = query.keyword?.trim();
 
-    const where: Prisma.RoleWhereInput = keyword
-      ? {
-          OR: [
-            { name: { contains: keyword } },
-            { code: { contains: keyword } },
-            { description: { contains: keyword } },
-          ],
-        }
-      : {};
+    const where: Prisma.RoleWhereInput = {
+      isDeleted: false,
+      ...(keyword
+        ? {
+            OR: [
+              { name: { contains: keyword } },
+              { code: { contains: keyword } },
+              { description: { contains: keyword } },
+            ],
+          }
+        : {}),
+    };
 
     const [total, roles] = await Promise.all([
       this.prisma.role.count({ where }),
@@ -101,6 +129,7 @@ export class RolesService {
 
   async getOptions(): Promise<RoleOptionDto[]> {
     const roles = await this.prisma.role.findMany({
+      where: { isDeleted: false },
       orderBy: { id: 'asc' },
       select: { id: true, name: true, code: true },
     });
@@ -112,8 +141,29 @@ export class RolesService {
     }));
   }
 
-  getPermissionTree() {
-    return buildPermissionTree();
+  async getPermissionTree() {
+    const [operationLines, deletedPermissions] = await Promise.all([
+      this.prisma.operationLine.findMany({
+        where: { enabled: true, isDeleted: false },
+        orderBy: [{ sort: 'asc' }, { id: 'asc' }],
+        select: { name: true, permissionCode: true },
+      }),
+      this.prisma.permission.findMany({
+        where: { isDeleted: true },
+        select: { code: true },
+      }),
+    ]);
+
+    const tree = buildPermissionTree(
+      operationLines.map((line) => ({
+        code: line.permissionCode,
+        title: line.name,
+      })),
+    );
+    return filterPermissionTree(
+      tree,
+      new Set(deletedPermissions.map((permission) => permission.code)),
+    );
   }
 
   async getUserOptions(
@@ -122,28 +172,32 @@ export class RolesService {
   ): Promise<RoleUserOptionDto[]> {
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
-      select: { id: true },
+      select: { id: true, isDeleted: true },
     });
-    if (!role) {
+    if (!role || role.isDeleted) {
       throw new NotFoundException('角色不存在');
     }
 
     const keyword = query.keyword?.trim();
     const users = await this.prisma.user.findMany({
-      where: keyword
-        ? {
-            OR: [
-              { username: { contains: keyword } },
-              { nickname: { contains: keyword } },
-            ],
-          }
-        : {},
+      where: {
+        isDeleted: false,
+        ...(keyword
+          ? {
+              OR: [
+                { username: { contains: keyword } },
+                { nickname: { contains: keyword } },
+              ],
+            }
+          : {}),
+      },
       select: {
         id: true,
         username: true,
         nickname: true,
         status: true,
         roles: {
+          where: { role: { isDeleted: false } },
           select: {
             role: {
               select: { id: true, code: true, name: true },
@@ -177,9 +231,9 @@ export class RolesService {
   ): Promise<UpdateRoleMembersResultDto> {
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
-      select: { id: true, code: true },
+      select: { id: true, code: true, isDeleted: true },
     });
-    if (!role) {
+    if (!role || role.isDeleted) {
       throw new NotFoundException('角色不存在');
     }
 
@@ -192,7 +246,7 @@ export class RolesService {
 
     const userIds = Array.from(new Set(dto.userIds));
     const existingUserCount = await this.prisma.user.count({
-      where: { id: { in: userIds } },
+      where: { id: { in: userIds }, isDeleted: false },
     });
     if (existingUserCount !== userIds.length) {
       throw new BadRequestException('部分用户不存在，请刷新后重试');
@@ -216,7 +270,7 @@ export class RolesService {
     }
 
     const userCount = await this.prisma.userRole.count({
-      where: { roleId },
+      where: { roleId, user: { isDeleted: false } },
     });
 
     return {
@@ -229,7 +283,7 @@ export class RolesService {
 
   async create(dto: CreateRoleDto) {
     if (await this.prisma.role.findUnique({ where: { code: dto.code } })) {
-      throw new ConflictException('角色编码已存在');
+      throw new ConflictException('角色编码已存在（含已删除角色）');
     }
 
     const permissions = await this.resolvePermissions(dto.permissions);
@@ -293,7 +347,10 @@ export class RolesService {
       );
     }
 
-    await this.prisma.role.delete({ where: { id } });
+    await this.prisma.role.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
     return { success: true };
   }
 
@@ -302,20 +359,20 @@ export class RolesService {
       where: { id },
       include: roleDetailInclude,
     });
-    if (!role) {
+    if (!role || role.isDeleted) {
       throw new NotFoundException('角色不存在');
     }
     return role;
   }
 
-  private async resolvePermissions(codes: PermissionCode[]) {
+  private async resolvePermissions(codes: string[]) {
     const uniqueCodes = Array.from(new Set(codes));
     const permissions = await this.prisma.permission.findMany({
-      where: { code: { in: uniqueCodes } },
+      where: { code: { in: uniqueCodes }, isDeleted: false },
     });
 
     if (permissions.length !== uniqueCodes.length) {
-      throw new BadRequestException('权限数据未初始化，请先执行数据库种子脚本');
+      throw new BadRequestException('包含无效或已删除的权限标识');
     }
 
     return permissions;

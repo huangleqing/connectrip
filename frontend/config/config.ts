@@ -54,5 +54,5 @@ export default defineConfig({
   hash: true,
   fastRefresh: true,
   npmClient: 'npm',
-  jsMinifier: 'terser',
+  jsMinifier: 'swc',
 });

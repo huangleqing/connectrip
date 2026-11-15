@@ -3,6 +3,13 @@ export const PERMISSIONS = {
   OPERATION_EXPORT: 'operation:export',
   OPERATION_AMOUNT_VIEW: 'operation:amount:view',
 
+  OPERATION_TOUR_CREATE: 'operation:tour:create',
+  OPERATION_TOUR_UPDATE: 'operation:tour:update',
+  OPERATION_TOUR_DELETE: 'operation:tour:delete',
+  OPERATION_LINE_CONFIG_CREATE: 'operation:line:config:create',
+  OPERATION_LINE_CONFIG_UPDATE: 'operation:line:config:update',
+  OPERATION_LINE_CONFIG_DELETE: 'operation:line:config:delete',
+
   OPERATION_LINE_TICKET: 'operation:line:ticket',
   OPERATION_LINE_CHONGQING: 'operation:line:chongqing',
   OPERATION_LINE_LAOS: 'operation:line:laos',
@@ -48,41 +55,70 @@ export interface PermissionDefinition {
   sort: number;
 }
 
-const OPERATION_LINE_LABELS: Array<{ name: string; code: PermissionCode }> = [
-  { name: '票务', code: PERMISSIONS.OPERATION_LINE_TICKET },
-  { name: '重庆', code: PERMISSIONS.OPERATION_LINE_CHONGQING },
-  { name: '老挝-LAO', code: PERMISSIONS.OPERATION_LINE_LAOS },
-  { name: '越南-VNM', code: PERMISSIONS.OPERATION_LINE_VIETNAM },
-  { name: '泰国-THA', code: PERMISSIONS.OPERATION_LINE_THAILAND },
-  { name: '法国-FRA', code: PERMISSIONS.OPERATION_LINE_FRANCE },
-  { name: '新加坡-SIN', code: PERMISSIONS.OPERATION_LINE_SINGAPORE },
-  { name: '阿联酋-UAE', code: PERMISSIONS.OPERATION_LINE_UAE },
-  { name: '马来西亚-MYS', code: PERMISSIONS.OPERATION_LINE_MALAYSIA },
-  { name: '蒙古国-MNG', code: PERMISSIONS.OPERATION_LINE_MONGOLIA },
-  { name: '个人业务-PB', code: PERMISSIONS.OPERATION_LINE_PERSONAL },
-  { name: '中国台湾', code: PERMISSIONS.OPERATION_LINE_TAIWAN },
-  { name: 'MYA-缅甸', code: PERMISSIONS.OPERATION_LINE_MYANMAR },
-  { name: '英国-UK', code: PERMISSIONS.OPERATION_LINE_UK },
-  { name: '文莱-BN', code: PERMISSIONS.OPERATION_LINE_BRUNEI },
-  { name: '加拿大-CA', code: PERMISSIONS.OPERATION_LINE_CANADA },
-  { name: '意大利-ITA', code: PERMISSIONS.OPERATION_LINE_ITALY },
+export interface BuiltinOperationLine {
+  name: string;
+  code: string;
+  permissionCode: PermissionCode;
+  sort: number;
+}
+
+export const BUILTIN_OPERATION_LINES: BuiltinOperationLine[] = [
+  { name: '票务', code: 'ticket', permissionCode: PERMISSIONS.OPERATION_LINE_TICKET, sort: 10 },
+  { name: '重庆', code: 'chongqing', permissionCode: PERMISSIONS.OPERATION_LINE_CHONGQING, sort: 20 },
+  { name: '老挝-LAO', code: 'laos', permissionCode: PERMISSIONS.OPERATION_LINE_LAOS, sort: 30 },
+  { name: '越南-VNM', code: 'vietnam', permissionCode: PERMISSIONS.OPERATION_LINE_VIETNAM, sort: 40 },
+  { name: '泰国-THA', code: 'thailand', permissionCode: PERMISSIONS.OPERATION_LINE_THAILAND, sort: 50 },
+  { name: '法国-FRA', code: 'france', permissionCode: PERMISSIONS.OPERATION_LINE_FRANCE, sort: 60 },
+  { name: '新加坡-SIN', code: 'singapore', permissionCode: PERMISSIONS.OPERATION_LINE_SINGAPORE, sort: 70 },
+  { name: '阿联酋-UAE', code: 'uae', permissionCode: PERMISSIONS.OPERATION_LINE_UAE, sort: 80 },
+  { name: '马来西亚-MYS', code: 'malaysia', permissionCode: PERMISSIONS.OPERATION_LINE_MALAYSIA, sort: 90 },
+  { name: '蒙古国-MNG', code: 'mongolia', permissionCode: PERMISSIONS.OPERATION_LINE_MONGOLIA, sort: 100 },
+  { name: '个人业务-PB', code: 'personal', permissionCode: PERMISSIONS.OPERATION_LINE_PERSONAL, sort: 110 },
+  { name: '中国台湾', code: 'taiwan', permissionCode: PERMISSIONS.OPERATION_LINE_TAIWAN, sort: 120 },
+  { name: 'MYA-缅甸', code: 'myanmar', permissionCode: PERMISSIONS.OPERATION_LINE_MYANMAR, sort: 130 },
+  { name: '英国-UK', code: 'uk', permissionCode: PERMISSIONS.OPERATION_LINE_UK, sort: 140 },
+  { name: '文莱-BN', code: 'brunei', permissionCode: PERMISSIONS.OPERATION_LINE_BRUNEI, sort: 150 },
+  { name: '加拿大-CA', code: 'canada', permissionCode: PERMISSIONS.OPERATION_LINE_CANADA, sort: 160 },
+  { name: '意大利-ITA', code: 'italy', permissionCode: PERMISSIONS.OPERATION_LINE_ITALY, sort: 170 },
 ];
 
 export const OPERATION_LINE_PERMISSION_CODES: PermissionCode[] =
-  OPERATION_LINE_LABELS.map((item) => item.code);
+  BUILTIN_OPERATION_LINES.map((item) => item.permissionCode);
+
+export const OPERATION_TOUR_ACTION_CODES: PermissionCode[] = [
+  PERMISSIONS.OPERATION_TOUR_CREATE,
+  PERMISSIONS.OPERATION_TOUR_UPDATE,
+  PERMISSIONS.OPERATION_TOUR_DELETE,
+];
+
+export const OPERATION_LINE_CONFIG_CODES: PermissionCode[] = [
+  PERMISSIONS.OPERATION_LINE_CONFIG_CREATE,
+  PERMISSIONS.OPERATION_LINE_CONFIG_UPDATE,
+  PERMISSIONS.OPERATION_LINE_CONFIG_DELETE,
+];
+
+export const OPERATION_ACTION_CODES: PermissionCode[] = [
+  ...OPERATION_TOUR_ACTION_CODES,
+  ...OPERATION_LINE_CONFIG_CODES,
+];
 
 const OPERATION_LINE_DEFINITIONS: PermissionDefinition[] =
-  OPERATION_LINE_LABELS.map((item, index) => ({
-    code: item.code,
+  BUILTIN_OPERATION_LINES.map((item) => ({
+    code: item.permissionCode,
     name: item.name,
     type: 'BUTTON',
     module: 'operation',
     moduleTitle: '操作中心',
     subgroup: 'operation-line',
     subgroupTitle: '线路 / 国家权限',
-    sort: 100 + index,
+    sort: 100 + item.sort,
   }));
 
+/**
+ * 所有页面按钮权限都从这里生成，并同步进入角色管理的权限树。
+ * 新增页面按钮时：在这里增加 BUTTON 定义、在 operation.controller.ts
+ * 使用 @RequirePermissions()，前端使用 <Access> 或 useAccess() 控制显示。
+ */
 export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   {
     code: PERMISSIONS.OPERATION_VIEW,
@@ -107,6 +143,66 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     module: 'operation',
     moduleTitle: '操作中心',
     sort: 3,
+  },
+  {
+    code: PERMISSIONS.OPERATION_TOUR_CREATE,
+    name: '新增团队',
+    type: 'BUTTON',
+    module: 'operation',
+    moduleTitle: '操作中心',
+    subgroup: 'operation-team-actions',
+    subgroupTitle: '团队操作',
+    sort: 4,
+  },
+  {
+    code: PERMISSIONS.OPERATION_TOUR_UPDATE,
+    name: '编辑团队',
+    type: 'BUTTON',
+    module: 'operation',
+    moduleTitle: '操作中心',
+    subgroup: 'operation-team-actions',
+    subgroupTitle: '团队操作',
+    sort: 5,
+  },
+  {
+    code: PERMISSIONS.OPERATION_TOUR_DELETE,
+    name: '删除团队',
+    type: 'BUTTON',
+    module: 'operation',
+    moduleTitle: '操作中心',
+    subgroup: 'operation-team-actions',
+    subgroupTitle: '团队操作',
+    sort: 6,
+  },
+  {
+    code: PERMISSIONS.OPERATION_LINE_CONFIG_CREATE,
+    name: '新增线路',
+    type: 'BUTTON',
+    module: 'operation',
+    moduleTitle: '操作中心',
+    subgroup: 'operation-line-actions',
+    subgroupTitle: '线路管理操作',
+    sort: 7,
+  },
+  {
+    code: PERMISSIONS.OPERATION_LINE_CONFIG_UPDATE,
+    name: '编辑线路',
+    type: 'BUTTON',
+    module: 'operation',
+    moduleTitle: '操作中心',
+    subgroup: 'operation-line-actions',
+    subgroupTitle: '线路管理操作',
+    sort: 8,
+  },
+  {
+    code: PERMISSIONS.OPERATION_LINE_CONFIG_DELETE,
+    name: '删除线路',
+    type: 'BUTTON',
+    module: 'operation',
+    moduleTitle: '操作中心',
+    subgroup: 'operation-line-actions',
+    subgroupTitle: '线路管理操作',
+    sort: 9,
   },
   ...OPERATION_LINE_DEFINITIONS,
   {
@@ -196,13 +292,30 @@ export interface PermissionTreeNode {
   children?: PermissionTreeNode[];
 }
 
+export interface PermissionLineItem {
+  code: string;
+  title: string;
+}
+
+const DEFAULT_PERMISSION_LINES: PermissionLineItem[] = BUILTIN_OPERATION_LINES.map(
+  (line) => ({ code: line.permissionCode, title: line.name }),
+);
+
 /**
  * 返回前端角色权限树。group 节点只用于分组，不保存到角色权限中。
+ * 线路权限来自 operation_lines 表，以支持手动新增线路。
  */
-export function buildPermissionTree(): PermissionTreeNode[] {
+export function buildPermissionTree(
+  operationLines: PermissionLineItem[] = DEFAULT_PERMISSION_LINES,
+): PermissionTreeNode[] {
   const modules = new Map<string, PermissionTreeNode>();
 
   for (const definition of PERMISSION_DEFINITIONS) {
+    // 线路权限统一由 operation_lines 提供，避免内置线路与数据库线路重复。
+    if (definition.subgroup === 'operation-line') {
+      continue;
+    }
+
     let group = modules.get(definition.module);
     if (!group) {
       group = {
@@ -214,12 +327,15 @@ export function buildPermissionTree(): PermissionTreeNode[] {
       modules.set(definition.module, group);
     }
 
-    let target = group;
+    const leaf: PermissionTreeNode = {
+      key: definition.code,
+      title: definition.name,
+      type: definition.type === 'MENU' ? 'menu' : 'button',
+    };
+
     if (definition.subgroup) {
       const subgroupKey = `group:${definition.subgroup}`;
-      let subgroup = group.children?.find(
-        (child) => child.type === 'group' && child.key === subgroupKey,
-      );
+      let subgroup = group.children?.find((node) => node.key === subgroupKey);
       if (!subgroup) {
         subgroup = {
           key: subgroupKey,
@@ -229,13 +345,24 @@ export function buildPermissionTree(): PermissionTreeNode[] {
         };
         group.children?.push(subgroup);
       }
-      target = subgroup;
+      subgroup.children?.push(leaf);
+      continue;
     }
 
-    target.children?.push({
-      key: definition.code,
-      title: definition.name,
-      type: definition.type === 'MENU' ? 'menu' : 'button',
+    group.children?.push(leaf);
+  }
+
+  const operationGroup = modules.get('operation');
+  if (operationGroup && operationLines.length) {
+    operationGroup.children?.push({
+      key: 'group:operation-line',
+      title: '线路 / 国家权限',
+      type: 'group',
+      children: operationLines.map((line) => ({
+        key: line.code,
+        title: line.title,
+        type: 'button' as const,
+      })),
     });
   }
 

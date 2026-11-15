@@ -2,6 +2,12 @@ export const PERMISSION_CODES = {
   OPERATION_VIEW: 'operation:view',
   OPERATION_EXPORT: 'operation:export',
   OPERATION_AMOUNT_VIEW: 'operation:amount:view',
+  OPERATION_TOUR_CREATE: 'operation:tour:create',
+  OPERATION_TOUR_UPDATE: 'operation:tour:update',
+  OPERATION_TOUR_DELETE: 'operation:tour:delete',
+  OPERATION_LINE_CONFIG_CREATE: 'operation:line:config:create',
+  OPERATION_LINE_CONFIG_UPDATE: 'operation:line:config:update',
+  OPERATION_LINE_CONFIG_DELETE: 'operation:line:config:delete',
 
   OPERATION_LINE_TICKET: 'operation:line:ticket',
   OPERATION_LINE_CHONGQING: 'operation:line:chongqing',
@@ -52,6 +58,15 @@ export const OPERATION_LINE_PERMISSION_CODES: string[] = [
   PERMISSION_CODES.OPERATION_LINE_ITALY,
 ];
 
+export const OPERATION_ACTION_CODES: string[] = [
+  PERMISSION_CODES.OPERATION_TOUR_CREATE,
+  PERMISSION_CODES.OPERATION_TOUR_UPDATE,
+  PERMISSION_CODES.OPERATION_TOUR_DELETE,
+  PERMISSION_CODES.OPERATION_LINE_CONFIG_CREATE,
+  PERMISSION_CODES.OPERATION_LINE_CONFIG_UPDATE,
+  PERMISSION_CODES.OPERATION_LINE_CONFIG_DELETE,
+];
+
 export const ALL_PERMISSION_CODES: string[] = Object.values(PERMISSION_CODES);
 
 export const permissionTree = [
@@ -63,6 +78,26 @@ export const permissionTree = [
       { key: PERMISSION_CODES.OPERATION_VIEW, title: '查看操作中心', type: 'menu' },
       { key: PERMISSION_CODES.OPERATION_EXPORT, title: '导出操作数据（Excel）', type: 'button' },
       { key: PERMISSION_CODES.OPERATION_AMOUNT_VIEW, title: '查看操作金额', type: 'button' },
+      {
+        key: 'group:operation-team-actions',
+        title: '团队操作',
+        type: 'group',
+        children: [
+          { key: PERMISSION_CODES.OPERATION_TOUR_CREATE, title: '新增团队', type: 'button' },
+          { key: PERMISSION_CODES.OPERATION_TOUR_UPDATE, title: '编辑团队', type: 'button' },
+          { key: PERMISSION_CODES.OPERATION_TOUR_DELETE, title: '删除团队', type: 'button' },
+        ],
+      },
+      {
+        key: 'group:operation-line-actions',
+        title: '线路管理操作',
+        type: 'group',
+        children: [
+          { key: PERMISSION_CODES.OPERATION_LINE_CONFIG_CREATE, title: '新增线路', type: 'button' },
+          { key: PERMISSION_CODES.OPERATION_LINE_CONFIG_UPDATE, title: '编辑线路', type: 'button' },
+          { key: PERMISSION_CODES.OPERATION_LINE_CONFIG_DELETE, title: '删除线路', type: 'button' },
+        ],
+      },
       {
         key: 'group:operation-line',
         title: '线路 / 国家权限',

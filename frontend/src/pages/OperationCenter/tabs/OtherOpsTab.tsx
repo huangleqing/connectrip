@@ -7,11 +7,11 @@ import {
   StarOutlined,
 } from '@ant-design/icons';
 import { Alert, App, Button, Tag } from 'antd';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import type { UpdateOperationTourParams } from '@/services/operation';
 import {
   OPERATION_STATE_META,
   type OperationKey,
-  type OperationSummary,
   type TourGroup,
 } from '../data';
 
@@ -74,20 +74,35 @@ const OTHER_OPERATIONS: OtherOperationCard[] = [
 
 interface OtherOpsTabProps {
   tour: TourGroup;
-  onUpdate: (key: OperationKey, summary: OperationSummary) => void;
+  canEdit: boolean;
+  onSaveTour: (patch: UpdateOperationTourParams) => Promise<void>;
 }
 
-export default function OtherOpsTab({ tour, onUpdate }: OtherOpsTabProps) {
+export default function OtherOpsTab({ tour, canEdit, onSaveTour }: OtherOpsTabProps) {
   const { message } = App.useApp();
+  const [savingKey, setSavingKey] = useState<OperationKey>();
   const pendingCount = OTHER_OPERATIONS.filter(
     (item) =>
       tour.operations[item.key].state === 'pending' ||
       tour.operations[item.key].state === 'processing',
   ).length;
 
-  const handleDone = (item: OtherOperationCard) => {
-    onUpdate(item.key, { state: 'done', text: item.doneText });
-    message.success(`${item.title}已标记为完成`);
+  const handleDone = async (item: OtherOperationCard) => {
+    if (!canEdit) return;
+    setSavingKey(item.key);
+    try {
+      await onSaveTour({
+        operations: {
+          ...tour.operations,
+          [item.key]: { state: 'done', text: item.doneText },
+        },
+      });
+      message.success(`${item.title}已标记为完成`);
+    } catch {
+      // 错误提示由请求层统一处理
+    } finally {
+      setSavingKey(undefined);
+    }
   };
 
   return (
@@ -156,15 +171,18 @@ export default function OtherOpsTab({ tour, onUpdate }: OtherOpsTabProps) {
                     {stateMeta.label}
                   </Tag>
                 </span>
-                {actionable ? (
+                {actionable && canEdit ? (
                   <Button
                     size="small"
                     type="primary"
                     ghost
+                    loading={savingKey === item.key}
                     onClick={() => handleDone(item)}
                   >
                     标记已完成
                   </Button>
+                ) : !canEdit && actionable ? (
+                  <span className="other-op-card__finished">仅可查看</span>
                 ) : (
                   <span className="other-op-card__finished">
                     {summary.state === 'not_required' ? '无需安排' : '已完成'}

@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { OperationModule } from './operation/operation.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesModule } from './roles/roles.module';
 import { UsersModule } from './users/users.module';
@@ -35,6 +36,7 @@ function validateEnv(config: Record<string, unknown>) {
     UsersModule,
     RolesModule,
     DashboardModule,
+    OperationModule,
   ],
   controllers: [AppController],
   providers: [

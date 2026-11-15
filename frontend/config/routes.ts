@@ -20,7 +20,24 @@ export default [
     name: '操作中心',
     icon: 'global',
     access: 'operation:view',
-    component: './OperationCenter',
+    routes: [
+      {
+        path: '/operation-center',
+        redirect: '/operation-center/console',
+      },
+      {
+        path: '/operation-center/console',
+        name: '操作中控台',
+        access: 'operation:view',
+        component: './OperationCenter',
+      },
+      {
+        path: '/operation-center/lines',
+        name: '线路管理',
+        access: 'operation:view',
+        component: './OperationCenter/Lines',
+      },
+    ],
   },
   {
     path: '/system',

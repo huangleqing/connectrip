@@ -14,20 +14,20 @@ interface PermissionTreeProps {
 }
 
 function isDataScope(permissionCode: string) {
-  return (
-    permissionCode.startsWith('operation:line:') ||
-    permissionCode === PERMISSIONS.OPERATION_AMOUNT_VIEW
-  );
+  return permissionCode === PERMISSIONS.OPERATION_AMOUNT_VIEW;
 }
 
-function toTreeData(nodes: PermissionNode[]): DataNode[] {
+function toTreeData(nodes: PermissionNode[], parentIsDataScope = false): DataNode[] {
   return nodes.map((node) => {
     if (node.children?.length) {
       return {
         key: node.key,
         selectable: false,
         title: <span className="permission-tree__group">{node.title}</span>,
-        children: toTreeData(node.children),
+        children: toTreeData(
+          node.children,
+          parentIsDataScope || node.key === 'group:operation-line',
+        ),
       };
     }
 
@@ -37,7 +37,7 @@ function toTreeData(nodes: PermissionNode[]): DataNode[] {
       title: (
         <span className="permission-tree__leaf">
           {node.title}
-          {isDataScope(node.key) ? (
+          {parentIsDataScope || isDataScope(node.key) ? (
             <Tag bordered={false} className="permission-tree__tag permission-tree__tag--data">
               数据
             </Tag>

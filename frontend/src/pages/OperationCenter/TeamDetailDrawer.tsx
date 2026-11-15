@@ -3,6 +3,8 @@ import {
   CalendarOutlined,
   CarOutlined,
   CoffeeOutlined,
+  DeleteOutlined,
+  EditOutlined,
   FileTextOutlined,
   HomeOutlined,
   NodeIndexOutlined,
@@ -10,9 +12,10 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Drawer, Tag, Tabs } from 'antd';
+import { Alert, Button, Drawer, Popconfirm, Space, Tag, Tabs } from 'antd';
 import dayjs from 'dayjs';
-import type { OperationKey, OperationSummary, TourGroup } from './data';
+import type { UpdateOperationTourParams } from '@/services/operation';
+import type { TourGroup } from './data';
 import { STAGE_META } from './data';
 import FleetTab from './tabs/FleetTab';
 import HotelTab from './tabs/HotelTab';
@@ -27,9 +30,13 @@ interface TeamDetailDrawerProps {
   activeTab: string;
   canViewAmount: boolean;
   canExport: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   onTabChange: (key: string) => void;
   onClose: () => void;
-  onUpdateOperation: (key: OperationKey, summary: OperationSummary) => void;
+  onSaveTour: (patch: UpdateOperationTourParams) => Promise<void>;
+  onEdit: () => void;
+  onDelete: () => void | Promise<void>;
 }
 
 export default function TeamDetailDrawer({
@@ -38,9 +45,13 @@ export default function TeamDetailDrawer({
   activeTab,
   canViewAmount,
   canExport,
+  canEdit,
+  canDelete,
   onTabChange,
   onClose,
-  onUpdateOperation,
+  onSaveTour,
+  onEdit,
+  onDelete,
 }: TeamDetailDrawerProps) {
   const items = tour
     ? [
@@ -64,7 +75,8 @@ export default function TeamDetailDrawer({
             <SubcontractTab
               tour={tour}
               canViewAmount={canViewAmount}
-              onDone={(summary) => onUpdateOperation('subcontract', summary)}
+              canEdit={canEdit}
+              onSaveTour={onSaveTour}
             />
           ),
         },
@@ -81,7 +93,8 @@ export default function TeamDetailDrawer({
               tour={tour}
               canViewAmount={canViewAmount}
               canExport={canExport}
-              onDone={(summary) => onUpdateOperation('hotel', summary)}
+              canEdit={canEdit}
+              onSaveTour={onSaveTour}
             />
           ),
         },
@@ -98,7 +111,8 @@ export default function TeamDetailDrawer({
               tour={tour}
               canViewAmount={canViewAmount}
               canExport={canExport}
-              onDone={(summary) => onUpdateOperation('restaurant', summary)}
+              canEdit={canEdit}
+              onSaveTour={onSaveTour}
             />
           ),
         },
@@ -114,7 +128,8 @@ export default function TeamDetailDrawer({
               tour={tour}
               canViewAmount={canViewAmount}
               canExport={canExport}
-              onDone={(summary) => onUpdateOperation('car', summary)}
+              canEdit={canEdit}
+              onSaveTour={onSaveTour}
             />
           ),
         },
@@ -126,7 +141,11 @@ export default function TeamDetailDrawer({
             </span>
           ),
           children: (
-            <OtherOpsTab tour={tour} onUpdate={onUpdateOperation} />
+            <OtherOpsTab
+              tour={tour}
+              canEdit={canEdit}
+              onSaveTour={onSaveTour}
+            />
           ),
         },
       ]
@@ -139,9 +158,50 @@ export default function TeamDetailDrawer({
       className="team-detail-drawer"
       title="团队操作详情"
       onClose={onClose}
+      extra={
+        canEdit || canDelete ? (
+          <Space size={8}>
+            {canEdit ? (
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                onClick={onEdit}
+              >
+                编辑团队
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Popconfirm
+                title={`确定删除 ${tour?.name ?? ''} 吗？`}
+                okText="确定"
+                okButtonProps={{ danger: true }}
+                cancelText="取消"
+                onConfirm={onDelete}
+              >
+                <Button size="small" danger icon={<DeleteOutlined />}>
+                  删除
+                </Button>
+              </Popconfirm>
+            ) : null}
+          </Space>
+        ) : null
+      }
     >
       {tour ? (
         <div className="team-drawer">
+          {!canEdit ? (
+            <Alert
+              className="team-drawer__readonly"
+              type="info"
+              showIcon
+              message={
+                canDelete
+                  ? '当前账号可查看和删除团队，但不能编辑'
+                  : '当前账号仅可查看团队操作详情'
+              }
+              description="编辑及资源安排保存需要「编辑团队」权限，删除需要「删除团队」权限。"
+            />
+          ) : null}
           <section className="team-drawer__hero">
             <div className="team-drawer__identity">
               <div className="team-drawer__eyebrow">

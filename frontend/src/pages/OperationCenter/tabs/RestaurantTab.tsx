@@ -2,6 +2,7 @@ import {
   CoffeeOutlined,
   DownloadOutlined,
   LockOutlined,
+  PlusOutlined,
   SaveOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -16,9 +17,9 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
+import type { UpdateOperationTourParams } from '@/services/operation';
 import {
   RESOURCE_STATUS_COLORS,
-  type OperationSummary,
   type RestaurantRow,
   type TourGroup,
 } from '../data';
@@ -32,7 +33,8 @@ interface RestaurantTabProps {
   tour: TourGroup;
   canViewAmount: boolean;
   canExport: boolean;
-  onDone: (summary: OperationSummary) => void;
+  canEdit: boolean;
+  onSaveTour: (patch: UpdateOperationTourParams) => Promise<void>;
 }
 
 const MEAL_COLORS: Record<RestaurantRow['meal'], string> = {
@@ -45,10 +47,12 @@ export default function RestaurantTab({
   tour,
   canViewAmount,
   canExport,
-  onDone,
+  canEdit,
+  onSaveTour,
 }: RestaurantTabProps) {
   const { message } = App.useApp();
   const [rows, setRows] = useState<RestaurantRow[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setRows(tour.restaurants.map((row) => ({ ...row })));
@@ -60,16 +64,59 @@ export default function RestaurantTab({
     );
   };
 
+  const addMeal = () => {
+    setRows((prev) => {
+      const itineraryIndex = Math.floor(prev.length / 3);
+      const itinerary = tour.itinerary[itineraryIndex] ?? tour.itinerary[0];
+      const meals: RestaurantRow['meal'][] = ['早', '中', '晚'];
+      return [
+        ...prev,
+        {
+          id: `meal-${Date.now()}`,
+          day: itinerary?.day ?? `D${itineraryIndex + 1}`,
+          date: itinerary?.date ?? '',
+          meal: meals[prev.length % 3],
+          restaurant: '',
+          phone: '',
+          standard: 0,
+          staffCount: 0,
+          details: '客人 1 桌',
+          amount: 0,
+          remark: '',
+          status: '待安排',
+        },
+      ];
+    });
+  };
+
   const summary = useMemo(() => {
     const amount = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
     const pending = rows.filter((row) => row.status === '待安排').length;
     return { amount, pending };
   }, [rows]);
 
-  const handleConfirm = () => {
-    setRows((prev) => prev.map((row) => ({ ...row, status: '已安排' })));
-    message.success(`已确认 ${rows.length} 餐的餐厅安排`);
-    onDone({ state: 'done', text: `${rows.length}餐已安排` });
+  const handleConfirm = async () => {
+    if (!canEdit) return;
+    const nextRows = rows.map((row) => ({
+      ...row,
+      status: '已安排' as const,
+    }));
+    setSaving(true);
+    try {
+      await onSaveTour({
+        restaurants: nextRows,
+        operations: {
+          ...tour.operations,
+          restaurant: { state: 'done', text: `${rows.length}餐已安排` },
+        },
+      });
+      setRows(nextRows);
+      message.success(`已确认 ${rows.length} 餐的餐厅安排`);
+    } catch {
+      // 错误提示由请求层统一处理
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleExport = async () => {
@@ -141,6 +188,7 @@ export default function RestaurantTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="填写餐厅名称"
           onChange={(event) =>
             updateRow(row.id, { restaurant: event.target.value })
@@ -155,6 +203,7 @@ export default function RestaurantTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="餐厅电话"
           onChange={(event) => updateRow(row.id, { phone: event.target.value })}
         />
@@ -170,6 +219,7 @@ export default function RestaurantTab({
           <InputNumber
             min={0}
             value={value}
+            disabled={!canEdit}
             prefix="¥"
             precision={0}
             style={{ width: '100%' }}
@@ -188,6 +238,7 @@ export default function RestaurantTab({
         <InputNumber
           min={0}
           value={value}
+          disabled={!canEdit}
           precision={0}
           style={{ width: '100%' }}
           onChange={(next) =>
@@ -203,6 +254,7 @@ export default function RestaurantTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="桌数、忌口等"
           onChange={(event) => updateRow(row.id, { details: event.target.value })}
         />
@@ -218,6 +270,7 @@ export default function RestaurantTab({
           <InputNumber
             min={0}
             value={value}
+            disabled={!canEdit}
             prefix="¥"
             precision={2}
             style={{ width: '100%' }}
@@ -234,6 +287,7 @@ export default function RestaurantTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="忌口、包房等要求"
           onChange={(event) => updateRow(row.id, { remark: event.target.value })}
         />
@@ -310,14 +364,27 @@ export default function RestaurantTab({
           <em>项</em>
         </div>
         <div className="resource-summary__actions">
+          {canEdit ? (
+            <Button icon={<PlusOutlined />} onClick={addMeal}>
+              添加餐次
+            </Button>
+          ) : null}
           {canExport ? (
             <Button icon={<DownloadOutlined />} onClick={handleExport}>
               导出 Excel
             </Button>
           ) : null}
-          <Button type="primary" icon={<SaveOutlined />} onClick={handleConfirm}>
-            确认全部安排
-          </Button>
+          {canEdit ? (
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={saving}
+              disabled={!rows.length}
+              onClick={handleConfirm}
+            >
+              确认全部安排
+            </Button>
+          ) : null}
         </div>
       </div>
 

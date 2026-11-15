@@ -53,8 +53,14 @@
 | --- | --- |
 | `operation:view` | 查看操作中心 |
 | `operation:export` | 导出操作数据（Excel） |
-| `operation:amount:view` | 查看操作金额；未授权时前端显示 `****` |
-| `operation:line:*` | 线路 / 国家数据权限，如 `operation:line:laos`、`operation:line:thailand` |
+| `operation:amount:view` | 查看操作金额；未授权时前端显示 `****`，接口返回金额脱敏 |
+| `operation:tour:create` | 新增团队 |
+| `operation:tour:update` | 编辑团队（含团队详情中的资源安排保存） |
+| `operation:tour:delete` | 删除团队 |
+| `operation:line:config:create` | 新增线路/国家分类 |
+| `operation:line:config:update` | 编辑线路/国家分类、启停 |
+| `operation:line:config:delete` | 删除线路/国家分类 |
+| `operation:line:*` | 线路 / 国家数据权限，由 `operation_lines.permissionCode` 动态生成 |
 | `system:user:view` | 查看用户列表 |
 | `system:user:create` | 新增用户 |
 | `system:user:update` | 编辑用户 / 启停账号 |
@@ -65,7 +71,9 @@
 | `system:role:update` | 编辑角色 / 分配权限 |
 | `system:role:delete` | 删除角色 |
 
-已有数据库升级操作中心权限时，在 `backend/` 执行 `npm run permissions:sync`，只补充线路/金额权限并授权内置角色，不重置用户数据。
+已有数据库升级操作中心权限时，在 `backend/` 执行 `npm run permissions:sync`。脚本会补充线路/金额/团队/线路管理按钮权限并授权内置角色，同时把旧 `operation:create` 授权迁移到 6 个新按钮权限，不重置用户数据。
+
+> 新增任何页面按钮时，都需要在 `backend/src/common/constants/permissions.ts` 的 `PERMISSION_DEFINITIONS` 中增加 `BUTTON` 定义，并同步前端 `PERMISSIONS` / `PERMISSION_LABELS`。后端接口使用 `@RequirePermissions()`，前端使用 `<Access>` 或 `useAccess()` 控制按钮显示；这样权限会自动出现在角色管理权限树中。
 
 ### 2.3 前端权限流程
 
@@ -409,6 +417,26 @@ GET /api/system/permissions
         { "key": "operation:export", "title": "导出操作数据（Excel）", "type": "button" },
         { "key": "operation:amount:view", "title": "查看操作金额", "type": "button" },
         {
+          "key": "group:operation-team-actions",
+          "title": "团队操作",
+          "type": "group",
+          "children": [
+            { "key": "operation:tour:create", "title": "新增团队", "type": "button" },
+            { "key": "operation:tour:update", "title": "编辑团队", "type": "button" },
+            { "key": "operation:tour:delete", "title": "删除团队", "type": "button" }
+          ]
+        },
+        {
+          "key": "group:operation-line-actions",
+          "title": "线路管理操作",
+          "type": "group",
+          "children": [
+            { "key": "operation:line:config:create", "title": "新增线路", "type": "button" },
+            { "key": "operation:line:config:update", "title": "编辑线路", "type": "button" },
+            { "key": "operation:line:config:delete", "title": "删除线路", "type": "button" }
+          ]
+        },
+        {
           "key": "group:operation-line",
           "title": "线路 / 国家权限",
           "type": "group",
@@ -427,9 +455,9 @@ GET /api/system/permissions
 - `group` 仅用于分组，不会保存到角色权限
 - 角色 `permissions` 只保存 `menu` / `button` 的权限标识
 - 前端权限树会自动过滤父级节点，只提交叶子权限
-- 示例中只列出部分线路，实际线路权限共 17 项；完整列表见 `backend/src/common/constants/permissions.ts`
-- 线路权限同样保存为叶子权限；后端操作列表接口应按当前用户持有的 `operation:line:*` 过滤团队，不能只依赖前端隐藏标签
-- 金额字段应在后端响应中按 `operation:amount:view` 脱敏，导出接口也必须执行同一校验
+- `线路 / 国家权限` 的叶子节点来自 `operation_lines` 表，支持手动新增线路；内置 17 条，新增线路会自动创建权限标识
+- 线路权限同样保存为叶子权限；后端操作列表接口按当前用户持有的 `operation:line:*` 过滤团队，不能只依赖前端隐藏标签
+- 金额字段会在后端响应中按 `operation:amount:view` 脱敏；导出接口也必须执行同一校验
 
 ### 4.12 新建角色
 
@@ -532,7 +560,137 @@ Content-Type: application/json
 - `super_admin` 角色只能由超级管理员添加成员；不允许批量移除 `super_admin` 角色
 - 接口使用 `system:role:update` 权限
 
-### 4.16 工作台概览
+### 4.16 操作中心：线路与团队
+
+#### 线路列表
+
+```http
+GET /api/operation/lines
+Authorization: Bearer <token>
+```
+
+返回当前账号有权限查看的已启用线路。超级管理员返回全部线路。
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "id": 1,
+      "name": "老挝-LAO",
+      "code": "laos",
+      "permissionCode": "operation:line:laos",
+      "sort": 30,
+      "enabled": true
+    }
+  ]
+}
+```
+
+#### 新增线路
+
+```http
+POST /api/operation/lines
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "日本-JPN",
+  "code": "japan-jpn",
+  "sort": 200
+}
+```
+
+权限：`operation:line:config:create`。后端会自动创建权限标识（如 `operation:line:japan_jpn`），将线路写入 `operation_lines`，并授权给创建人所属角色及超级管理员。新线路会进入角色权限树。
+
+线路编辑：`PATCH /api/operation/lines/:id`，权限 `operation:line:config:update`，可修改名称、编码、排序和启用状态；权限标识保持不变。
+
+线路删除：`DELETE /api/operation/lines/:id`，权限 `operation:line:config:delete`，只将线路及其下团队的 `delete` 字段置为 `true`，数据保留在数据库中，但不再出现在列表、角色权限树和统计中。
+
+#### 团队列表
+
+```http
+GET /api/operation/tours?lineId=1&stage=today_depart&keyword=老挝
+Authorization: Bearer <token>
+```
+
+按当前账号持有的 `operation:line:*` 权限过滤。未授权金额字段返回 0，前端展示为 `****`。
+
+#### 团队详情
+
+```http
+GET /api/operation/tours/:id
+Authorization: Bearer <token>
+```
+
+权限：`operation:view`，且当前账号必须拥有该团队所属线路权限。用于团队编辑页按 ID 加载单个团队；团队不存在、已软删除或线路权限不足时返回 404/403。
+
+#### 新增团队
+
+```http
+POST /api/operation/tours
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "lineId": 1,
+  "name": "老挝重庆武隆5日游",
+  "stage": "today_depart",
+  "departureDate": "2026-11-14",
+  "returnDate": "2026-11-19",
+  "source": "老挝",
+  "agency": "老挝高登",
+  "peopleTotal": 15,
+  "peopleAdults": 12,
+  "peopleChildren": 3,
+  "owner": "林悦",
+  "assistant": "肖雨",
+  "itinerary": [
+    { "day": "D1", "date": "11.14", "content": "抵达重庆，入住酒店" }
+  ]
+}
+```
+
+权限：`operation:tour:create`，且当前账号必须拥有目标线路权限。订单编号、团号未传时由后端自动生成；未传的行程/转包/资源数据会生成默认结构。
+
+#### 更新团队业务详情
+
+```http
+PATCH /api/operation/tours/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "operations": {
+    "hotel": { "state": "done", "text": "5晚已安排" }
+  },
+  "hotels": [
+    {
+      "id": "hotel-1",
+      "day": "D1",
+      "date": "11.14",
+      "hotel": "重庆康铂酒店",
+      "roomSummary": "12大3小 + 1司导房",
+      "price": 180,
+      "amount": 1440,
+      "remark": "",
+      "status": "已安排"
+    }
+  ]
+}
+```
+
+权限：`operation:tour:update`，且当前账号必须拥有该团队所属线路权限。可更新 `itinerary`、`operations`、`subcontract`、`hotels`、`restaurants`、`fleet` 及团队主字段（包括 `lineId`，用于调整所属线路）。
+
+团队删除：`DELETE /api/operation/tours/:id`，权限 `operation:tour:delete`，同时需要拥有该团队所属线路权限。删除为软删除，只将 `delete` 置为 `true`，数据库记录保留。
+
+#### 数据表
+
+- `operation_lines`：线路名称/编码、`permissionCode`、排序、启用状态、软删除列 `delete`
+- `tour_groups`：订单编号、团号、团队主字段、行程/操作/转包/酒店/餐厅/车队 JSON、票务与资源备注、软删除列 `delete`
+
+### 4.17 工作台概览
 
 ```http
 GET /api/dashboard/summary
@@ -543,8 +701,8 @@ GET /api/dashboard/summary
   "userCount": 12,
   "activeUserCount": 10,
   "roleCount": 4,
-  "permissionCount": 11,
-  "todayOperations": 168,
+  "permissionCount": 30,
+  "todayOperations": 0,
   "systemStatus": "operational",
   "recentUsers": []
 }
@@ -624,9 +782,68 @@ model RolePermission {
 
   @@id([roleId, permissionId])
 }
+
+model OperationLine {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  code           String   @unique
+  permissionCode String   @unique
+  sort           Int      @default(0)
+  enabled        Boolean  @default(true)
+  tours          TourGroup[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("operation_lines")
+}
+
+model TourGroup {
+  id              Int           @id @default(autoincrement())
+  lineId          Int
+  line            OperationLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
+  stage           String
+  orderNo         String        @unique
+  tourNo          String        @unique
+  name            String
+  flightsOutbound String
+  flightsInbound  String
+  source          String
+  agency          String
+  peopleTotal     Int
+  peopleAdults    Int
+  peopleChildren  Int
+  owner           String
+  assistant       String
+  departureDate   String
+  returnDate      String
+  itinerary       Json
+  operations      Json
+  subcontract     Json
+  hotels          Json
+  restaurants     Json
+  fleet           Json
+  ticket          String
+  visa            String
+  scenic          String
+  performance     String
+  transport       String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("tour_groups")
+}
 ```
 
 权限树分组可以由 `Permission.module` + 固定的模块名称映射构建，也可以使用独立的分组表。
+
+## 5.1 软删除约定
+
+`users`、`roles`、`permissions`、`operation_lines`、`tour_groups` 均包含实际数据库列 `delete`（Prisma 字段 `isDeleted`）。接口的删除操作只把该列置为 `true`，不会物理删除记录。
+
+- 登录、用户/角色列表、角色选项、权限树、团队/线路列表、统计和导出都会过滤已删除数据
+- 用户、角色、权限之间存在关联时，已删除的用户/角色/权限不会参与权限计算
+- `user_roles`、`role_permissions` 关联表不增加 `delete` 列
+- `delete` 字段不提供页面开关，由 DBeaver、Prisma Studio 等数据库工具直接编辑，可用于恢复已删除数据
 
 ## 6. NestJS 实现要点
 

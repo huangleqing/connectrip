@@ -569,6 +569,20 @@
   color: #ea580c;
 }
 
+.team-row-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.team-row-actions__link.ant-btn {
+  height: 26px;
+  padding-inline: 4px;
+  font-size: 10px;
+}
+
 .team-action-button.ant-btn {
   height: 27px;
   padding-inline: 9px;
@@ -658,6 +672,21 @@
   color: #1e2f44;
   font-weight: 600;
   font-size: 15px;
+}
+
+.team-detail-drawer .ant-drawer-extra {
+  display: flex;
+  align-items: center;
+}
+
+.team-edit-meta {
+  margin-bottom: 16px;
+  padding: 9px 12px;
+  color: #77879a;
+  font-size: 11px;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  border-radius: 8px;
 }
 
 .team-detail-drawer .ant-drawer-body {
@@ -1545,4 +1574,40 @@
   .team-cell__name {
     transition: none;
   }
+}
+
+/* ---------- 操作中控台内部页签 ---------- */
+
+.operation-console-tabs .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.operation-console-tabs .ant-tabs-tab {
+  padding: 6px 16px;
+  font-size: 12px;
+  border-radius: 8px 8px 0 0;
+}
+
+.operation-console-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  font-weight: 600;
+}
+
+.operation-console-tabs .ant-tabs-tab-remove {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.operation-console-tabs .ant-tabs-tab-remove:hover {
+  color: #ef4444;
+}
+
+.operation-console-tabs .ant-tabs-content-holder,
+.operation-console-tabs .ant-tabs-content,
+.operation-console-tabs .ant-tabs-tabpane {
+  height: auto;
+}
+
+.team-drawer__readonly {
+  margin: 16px 28px 0;
+  border-radius: 10px;
 }

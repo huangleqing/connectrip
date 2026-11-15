@@ -1,14 +1,15 @@
 import { Prisma } from '@prisma/client';
-import { ALL_PERMISSION_CODES } from '../constants/permissions';
 import { SUPER_ADMIN_ROLE_CODE } from '../constants/roles';
 import type { AuthUser } from '../types/auth-user';
 
 export const userWithRolesInclude = Prisma.validator<Prisma.UserInclude>()({
   roles: {
+    where: { role: { isDeleted: false } },
     include: {
       role: {
         include: {
           permissions: {
+            where: { permission: { isDeleted: false } },
             include: {
               permission: true,
             },
@@ -45,9 +46,7 @@ export function buildCurrentUser(user: UserWithRoles): AuthUser {
       code: role.code,
       name: role.name,
     })),
-    permissions: isSuperAdmin
-      ? [...ALL_PERMISSION_CODES]
-      : ALL_PERMISSION_CODES.filter((code) => granted.has(code)),
+    permissions: Array.from(granted),
     isSuperAdmin,
   };
 }

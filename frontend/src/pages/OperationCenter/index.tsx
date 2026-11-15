@@ -5,6 +5,7 @@ import {
   ExportOutlined,
   GlobalOutlined,
   LogoutOutlined,
+  PlusOutlined,
   ReloadOutlined,
   RiseOutlined,
   SearchOutlined,
@@ -14,7 +15,8 @@ import {
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
-import { Access, useAccess, useModel } from '@umijs/max';
+import { useAccess, useModel } from '@umijs/max';
+import { useRequest } from 'ahooks';
 import {
   Alert,
   App,
@@ -22,27 +24,35 @@ import {
   DatePicker,
   Empty,
   Input,
+  Popconfirm,
   Select,
+  Tabs,
   Tag,
   Tooltip,
 } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { PERMISSIONS } from '@/constants/permissions';
 import {
-  OPERATION_LINE_PERMISSION_MAP,
-  PERMISSIONS,
-} from '@/constants/permissions';
+  deleteOperationTour,
+  getOperationLines,
+  getOperationTours,
+  updateOperationTour,
+  type UpdateOperationTourParams,
+} from '@/services/operation';
 import TeamDetailDrawer from './TeamDetailDrawer';
+import TeamForm from './TeamForm';
 import {
-  COUNTRY_FILTERS,
-  INITIAL_TOURS,
   OPERATION_META,
   STAGE_META,
-  type OperationKey,
   type OperationSummary,
   type TourGroup,
   type TourStage,
 } from './data';
+import {
+  notifyOperationDataChanged,
+  subscribeOperationDataChanged,
+} from '@/utils/operationEvents';
 import { downloadExcel } from './utils';
 import './index.less';
 
@@ -93,6 +103,21 @@ export default function OperationCenterPage() {
   const { message } = App.useApp();
   const canExport = access.hasPermission(PERMISSIONS.OPERATION_EXPORT);
   const canViewAmount = access.hasPermission(PERMISSIONS.OPERATION_AMOUNT_VIEW);
+  const canCreateTour = access.hasPermission(PERMISSIONS.OPERATION_TOUR_CREATE);
+  const canUpdateTour = access.hasPermission(PERMISSIONS.OPERATION_TOUR_UPDATE);
+  const canDeleteTour = access.hasPermission(PERMISSIONS.OPERATION_TOUR_DELETE);
+
+  const {
+    data: linesData,
+    loading: linesLoading,
+    error: linesError,
+    refresh: refreshLines,
+  } = useRequest(getOperationLines);
+  const {
+    data: tourData,
+    loading: toursLoading,
+    refresh: refreshTours,
+  } = useRequest(getOperationTours);
 
   // 角色权限可能已被管理员调整，进入操作中心时重新拉取当前账号权限。
   useEffect(() => {
@@ -101,7 +126,18 @@ export default function OperationCenterPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [tours, setTours] = useState<TourGroup[]>(INITIAL_TOURS);
+  useEffect(
+    () =>
+      subscribeOperationDataChanged((change) => {
+        if (change.source === 'console') return;
+        void refreshLines();
+        void refreshTours();
+      }),
+    [refreshLines, refreshTours],
+  );
+
+  const lines = linesData ?? [];
+  const [tours, setTours] = useState<TourGroup[]>([]);
   const [country, setCountry] = useState('全部');
   const [stage, setStage] = useState<'all' | TourStage>('all');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
@@ -109,39 +145,30 @@ export default function OperationCenterPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeTour, setActiveTour] = useState<TourGroup>();
   const [activeTab, setActiveTab] = useState('itinerary');
+  const [innerTab, setInnerTab] = useState<'list' | 'form'>('list');
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [editingTour, setEditingTour] = useState<TourGroup>();
+  const [formKey, setFormKey] = useState(0);
 
-  const countryAccess = useMemo(() => {
-    return COUNTRY_FILTERS.filter((label) => label !== '全部').reduce<
-      Record<string, boolean>
-    >((result, label) => {
-      const permission = OPERATION_LINE_PERMISSION_MAP[label];
-      result[label] = Boolean(permission && access.hasPermission(permission));
-      return result;
-    }, {});
-  }, [access]);
+  useEffect(() => {
+    setTours((tourData ?? []) as TourGroup[]);
+  }, [tourData]);
 
-  const accessibleCountryLabels = useMemo(
-    () =>
-      COUNTRY_FILTERS.filter(
-        (label) => label === '全部' || countryAccess[label],
-      ),
-    [countryAccess],
-  );
-
-  const permittedTours = useMemo(
-    () => tours.filter((tour) => countryAccess[tour.country]),
-    [tours, countryAccess],
+  const lineFilters = useMemo(
+    () => ['全部', ...lines.map((line) => line.name)],
+    [lines],
   );
 
   useEffect(() => {
-    if (country !== '全部' && !accessibleCountryLabels.includes(country)) {
+    if (country !== '全部' && !lineFilters.includes(country)) {
       setCountry('全部');
     }
-  }, [accessibleCountryLabels, country]);
+  }, [lineFilters, country]);
 
   const baseTours = useMemo(() => {
     const text = keyword.trim().toLowerCase();
-    return permittedTours.filter((tour) => {
+    return tours.filter((tour) => {
       if (country !== '全部' && tour.country !== country) {
         return false;
       }
@@ -163,7 +190,7 @@ export default function OperationCenterPage() {
       }
       return true;
     });
-  }, [permittedTours, country, dateRange, keyword]);
+  }, [tours, country, dateRange, keyword]);
 
   const filteredTours = useMemo(() => {
     if (stage === 'all') {
@@ -192,11 +219,11 @@ export default function OperationCenterPage() {
   }, [baseTours]);
 
   const countryCounts = useMemo(() => {
-    return permittedTours.reduce<Record<string, number>>((acc, tour) => {
+    return tours.reduce<Record<string, number>>((acc, tour) => {
       acc[tour.country] = (acc[tour.country] ?? 0) + 1;
       return acc;
     }, {});
-  }, [permittedTours]);
+  }, [tours]);
 
   const openDrawer = (tour: TourGroup, tab: string) => {
     setActiveTour(tours.find((item) => item.id === tour.id) ?? tour);
@@ -204,34 +231,85 @@ export default function OperationCenterPage() {
     setDrawerOpen(true);
   };
 
-  const updateOperation = (key: OperationKey, summary: OperationSummary) => {
-    if (!activeTour) {
+  const handleSaveTour = async (patch: UpdateOperationTourParams) => {
+    if (!activeTour || !canUpdateTour) {
       return;
     }
+    const updated = await updateOperationTour(activeTour.id, patch);
     setTours((prev) =>
-      prev.map((tour) =>
-        tour.id === activeTour.id
-          ? {
-              ...tour,
-              operations: {
-                ...tour.operations,
-                [key]: summary,
-              },
-            }
-          : tour,
-      ),
+      prev.map((tour) => (tour.id === updated.id ? updated : tour)),
     );
-    setActiveTour((prev) =>
-      prev
-        ? {
-            ...prev,
-            operations: {
-              ...prev.operations,
-              [key]: summary,
-            },
-          }
-        : prev,
-    );
+    setActiveTour(updated);
+  };
+
+  const handleDeleteTourRecord = async (tour: TourGroup) => {
+    if (!canDeleteTour) return;
+    try {
+      await deleteOperationTour(tour.id);
+      setTours((prev) => prev.filter((item) => item.id !== tour.id));
+      if (activeTour?.id === tour.id) {
+        setActiveTour(undefined);
+        setDrawerOpen(false);
+      }
+      notifyOperationDataChanged({ source: 'console' });
+      message.success(`团队「${tour.name}」已删除，数据已保留`);
+    } catch {
+      // 错误提示由请求层统一处理
+    }
+  };
+
+  const handleDeleteTour = () => {
+    if (activeTour) {
+      return handleDeleteTourRecord(activeTour);
+    }
+    return undefined;
+  };
+
+  const closeFormTab = () => {
+    setInnerTab('list');
+    setFormOpen(false);
+    setFormMode('create');
+    setEditingTour(undefined);
+    setFormKey((key) => key + 1);
+  };
+
+  const openCreateTour = () => {
+    if (!canCreateTour) return;
+    setFormOpen(true);
+    if (!formOpen || formMode !== 'create') {
+      setFormMode('create');
+      setEditingTour(undefined);
+      setFormKey((key) => key + 1);
+    }
+    setInnerTab('form');
+  };
+
+  const openEditTour = (tour: TourGroup) => {
+    if (!canUpdateTour) return;
+    const sameEditingTour =
+      formOpen && formMode === 'edit' && editingTour?.id === tour.id;
+    setFormOpen(true);
+    setFormMode('edit');
+    setEditingTour(tour);
+    if (!sameEditingTour) {
+      setFormKey((key) => key + 1);
+    }
+    setInnerTab('form');
+  };
+
+  const handleTeamSaved = (saved: TourGroup, mode: 'create' | 'edit') => {
+    if (mode === 'edit') {
+      setEditingTour(saved);
+      setTours((previous) =>
+        previous.map((tour) => (tour.id === saved.id ? saved : tour)),
+      );
+      if (activeTour?.id === saved.id) {
+        setActiveTour(saved);
+      }
+    }
+    void refreshTours();
+    void refreshLines();
+    notifyOperationDataChanged({ source: 'console' });
   };
 
   const resetFilters = () => {
@@ -438,16 +516,46 @@ export default function OperationCenterPage() {
       title: '操作',
       key: 'action',
       fixed: 'right',
-      width: 100,
+      width: 205,
       align: 'center',
       render: (_, record) => (
-        <Button
-          size="small"
-          className="team-action-button"
-          onClick={() => openDrawer(record, 'itinerary')}
-        >
-          团队操作
-        </Button>
+        <div className="team-row-actions">
+          <Button
+            size="small"
+            className="team-action-button"
+            onClick={() => openDrawer(record, 'itinerary')}
+          >
+            团队操作
+          </Button>
+          {canUpdateTour ? (
+            <Button
+              type="link"
+              size="small"
+              className="team-row-actions__link"
+              onClick={() => openEditTour(record)}
+            >
+              编辑
+            </Button>
+          ) : null}
+          {canDeleteTour ? (
+            <Popconfirm
+              title={`确定删除 ${record.name} 吗？`}
+              okText="确定"
+              okButtonProps={{ danger: true }}
+              cancelText="取消"
+              onConfirm={() => handleDeleteTourRecord(record)}
+            >
+              <Button
+                type="link"
+                size="small"
+                danger
+                className="team-row-actions__link"
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          ) : null}
+        </div>
       ),
     },
   ];
@@ -456,24 +564,27 @@ export default function OperationCenterPage() {
     <PageContainer
       title="操作中控台"
       subTitle="出团团队、地接资源与财务进度的统一操作台"
-      extra={
-        <Access
-          accessible={canExport}
-          fallback={
-            <Tooltip title="当前账号缺少 operation:export 权限">
-              <Button icon={<ExportOutlined />} disabled>
-                导出 Excel
-              </Button>
-            </Tooltip>
-          }
-        >
-          <Button type="primary" icon={<ExportOutlined />} onClick={handleExport}>
-            导出 Excel
-          </Button>
-        </Access>
-      }
+      breadcrumbRender={false}
     >
-      <div className="operation-console">
+      <div className="operation-console-tabs">
+        <Tabs
+          type="editable-card"
+          hideAdd
+          activeKey={innerTab}
+          className="operation-console__tabs"
+          onChange={(key) => setInnerTab(key as 'list' | 'form')}
+          onEdit={(targetKey, action) => {
+            if (action === 'remove' && targetKey === 'form') {
+              closeFormTab();
+            }
+          }}
+          items={[
+            {
+              key: 'list',
+              label: '列表',
+              closable: false,
+              children: (
+                <div className="operation-console">
         <section className="console-filter-card">
           <div className="console-filter__head">
             <div className="console-filter__title">
@@ -484,14 +595,14 @@ export default function OperationCenterPage() {
             <span className="console-filter__tip">
               {access.isSuperAdmin
                 ? '超级管理员默认拥有全部线路与金额权限'
-                : `已按角色开通 ${accessibleCountryLabels.length - 1} 条线路${
+                : `已按角色开通 ${lines.length} 条线路${
                     canViewAmount ? '' : ' · 金额已隐藏'
                   }`}
             </span>
           </div>
           <div className="country-pills">
-            {accessibleCountryLabels.map((item) => {
-              const count = item === '全部' ? permittedTours.length : countryCounts[item];
+            {lineFilters.map((item) => {
+              const count = item === '全部' ? tours.length : countryCounts[item];
               return (
                 <button
                   key={item}
@@ -507,13 +618,22 @@ export default function OperationCenterPage() {
               );
             })}
           </div>
-          {accessibleCountryLabels.length <= 1 ? (
+          {!linesLoading && lineFilters.length <= 1 ? (
             <Alert
               className="console-line-alert"
               type="warning"
               showIcon
               message="当前账号未分配线路权限"
               description="请联系管理员在「系统管理 → 角色管理 → 线路 / 国家权限」中勾选需要查看的线路。"
+            />
+          ) : null}
+          {linesError ? (
+            <Alert
+              className="console-line-alert"
+              type="error"
+              showIcon
+              message="操作中心数据接口不可用"
+              description="当前可能运行在 Mock 模式。请启动 NestJS 后端，并使用 npm run dev:server 启动前端。"
             />
           ) : null}
           <div className="console-filter__divider" />
@@ -595,11 +715,12 @@ export default function OperationCenterPage() {
           rowKey="id"
           columns={columns}
           dataSource={filteredTours}
+          loading={toursLoading || linesLoading}
           search={false}
           options={false}
           cardBordered={false}
           tableLayout="fixed"
-          scroll={{ x: 1980 }}
+          scroll={{ x: 2085 }}
           pagination={{
             pageSize: 8,
             showSizeChanger: false,
@@ -611,6 +732,39 @@ export default function OperationCenterPage() {
               <em>点击操作进度进入对应安排页 · 左右滚动查看全部进度</em>
             </div>
           }
+          toolBarRender={() => {
+            const actions: ReactNode[] = [];
+            if (canCreateTour) {
+              actions.push(
+                <Button
+                  key="create"
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={openCreateTour}
+                >
+                  新增
+                </Button>,
+              );
+            }
+            actions.push(
+              canExport ? (
+                <Button
+                  key="export"
+                  icon={<ExportOutlined />}
+                  onClick={handleExport}
+                >
+                  导出 Excel
+                </Button>
+              ) : (
+                <Tooltip key="export" title="当前账号缺少 operation:export 权限">
+                  <Button icon={<ExportOutlined />} disabled>
+                    导出 Excel
+                  </Button>
+                </Tooltip>
+              ),
+            );
+            return actions;
+          }}
           locale={{
             emptyText: (
               <Empty
@@ -622,6 +776,31 @@ export default function OperationCenterPage() {
             ),
           }}
         />
+                </div>
+              ),
+            },
+            ...(formOpen
+              ? [
+                  {
+                    key: 'form',
+                    label: formMode === 'create' ? '新增' : '编辑',
+                    closable: true,
+                    children: (
+                      <TeamForm
+                        key={formKey}
+                        mode={formMode}
+                        tour={editingTour}
+                        lines={lines}
+                        linesLoading={linesLoading}
+                        onSaved={handleTeamSaved}
+                        onCancel={closeFormTab}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
       </div>
 
       <TeamDetailDrawer
@@ -630,9 +809,18 @@ export default function OperationCenterPage() {
         activeTab={activeTab}
         canViewAmount={canViewAmount}
         canExport={canExport}
+        canEdit={canUpdateTour}
+        canDelete={canDeleteTour}
         onTabChange={setActiveTab}
         onClose={() => setDrawerOpen(false)}
-        onUpdateOperation={updateOperation}
+        onSaveTour={handleSaveTour}
+        onEdit={() => {
+          if (activeTour) {
+            setDrawerOpen(false);
+            openEditTour(activeTour);
+          }
+        }}
+        onDelete={handleDeleteTour}
       />
     </PageContainer>
   );

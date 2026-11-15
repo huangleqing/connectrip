@@ -1,4 +1,5 @@
 import { AccessDenied, AvatarDropdown, Footer, HeaderActions } from '@/components';
+import GlobalTabs from '@/components/GlobalTabs';
 import { getCurrentUser } from '@/services/auth';
 import type { CurrentUser, InitialState } from '@/types';
 import { getToken } from '@/utils/auth';
@@ -47,6 +48,7 @@ export const layout: RunTimeLayoutConfig = ({ initialState }) => {
       render: (_, avatarChildren) => <AvatarDropdown>{avatarChildren}</AvatarDropdown>,
     },
     actionsRender: () => [<HeaderActions key="header-help" />],
+    childrenRender: () => <GlobalTabs />,
     footerRender: () => <Footer />,
     menuFooterRender: (props) =>
       props?.collapsed ? null : <div className="gd-sider-footer">RBAC · 精细化权限控制</div>,

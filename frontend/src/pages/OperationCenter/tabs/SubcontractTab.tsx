@@ -19,17 +19,15 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
-import type {
-  OperationSummary,
-  SubcontractItem,
-  TourGroup,
-} from '../data';
+import type { UpdateOperationTourParams } from '@/services/operation';
+import type { SubcontractItem, TourGroup } from '../data';
 import { MASKED_AMOUNT, displayMoney } from '../utils';
 
 interface SubcontractTabProps {
   tour: TourGroup;
   canViewAmount: boolean;
-  onDone: (summary: OperationSummary) => void;
+  canEdit: boolean;
+  onSaveTour: (patch: UpdateOperationTourParams) => Promise<void>;
 }
 
 interface SubcontractFormValues {
@@ -57,11 +55,13 @@ const AGENCY_OPTIONS = [
 export default function SubcontractTab({
   tour,
   canViewAmount,
-  onDone,
+  canEdit,
+  onSaveTour,
 }: SubcontractTabProps) {
   const { message } = App.useApp();
   const [form] = Form.useForm<SubcontractFormValues>();
   const [items, setItems] = useState<SubcontractItem[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     form.setFieldsValue({
@@ -112,12 +112,26 @@ export default function SubcontractTab({
   }, [items]);
 
   const handleSubmit = async () => {
+    if (!canEdit) return;
+    setSaving(true);
     try {
       const values = await form.validateFields();
+      await onSaveTour({
+        subcontract: {
+          ...values,
+          fax: values.fax ?? '',
+          items,
+        },
+        operations: {
+          ...tour.operations,
+          subcontract: { state: 'done', text: '已安排' },
+        },
+      });
       message.success(`地接安排已提交给 ${values.agency}`);
-      onDone({ state: 'done', text: '已安排' });
     } catch {
-      // 表单校验提示由 Ant Design 展示
+      // 表单校验与请求错误均已有对应提示
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -184,16 +198,17 @@ export default function SubcontractTab({
       key: 'action',
       width: 52,
       align: 'center',
-      render: (_, record) => (
-        <Button
-          type="text"
-          danger
-          size="small"
-          icon={<DeleteOutlined />}
-          disabled={items.length <= 1}
-          onClick={() => removeItem(record.id)}
-        />
-      ),
+      render: (_, record) =>
+        canEdit ? (
+          <Button
+            type="text"
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            disabled={items.length <= 1}
+            onClick={() => removeItem(record.id)}
+          />
+        ) : null,
     },
   ];
 
@@ -229,6 +244,7 @@ export default function SubcontractTab({
         layout="vertical"
         className="subcontract-form"
         requiredMark={false}
+        disabled={!canEdit}
       >
         <div className="form-section-title">地接社信息</div>
         <Row gutter={16}>
@@ -285,9 +301,11 @@ export default function SubcontractTab({
 
         <div className="form-section-title form-section-title--row">
           <span>地接项目</span>
-          <Button icon={<PlusOutlined />} size="small" onClick={addItem}>
-            添加项目
-          </Button>
+          {canEdit ? (
+            <Button icon={<PlusOutlined />} size="small" onClick={addItem}>
+              添加项目
+            </Button>
+          ) : null}
         </div>
 
         <Table<SubcontractItem>
@@ -331,15 +349,22 @@ export default function SubcontractTab({
         </Row>
       </Form>
 
-      <div className="tab-submit-bar">
-        <div>
-          <span>提交后状态变为「已安排」</span>
-          <em>如需调整项目，可在出团前随时修改并重新提交</em>
+      {canEdit ? (
+        <div className="tab-submit-bar">
+          <div>
+            <span>提交后状态变为「已安排」</span>
+            <em>如需调整项目，可在出团前随时修改并重新提交</em>
+          </div>
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            loading={saving}
+            onClick={handleSubmit}
+          >
+            提交地接安排
+          </Button>
         </div>
-        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit}>
-          提交地接安排
-        </Button>
-      </div>
+      ) : null}
     </div>
   );
 }

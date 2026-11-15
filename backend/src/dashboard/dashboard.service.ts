@@ -23,13 +23,15 @@ export class DashboardService {
 
     const [userCount, activeUserCount, roleCount, permissionCount, recentUsers] =
       await Promise.all([
-        this.prisma.user.count(),
-        this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
-        this.prisma.role.count(),
-        this.prisma.permission.count(),
+        this.prisma.user.count({ where: { isDeleted: false } }),
+        this.prisma.user.count({
+          where: { status: UserStatus.ACTIVE, isDeleted: false },
+        }),
+        this.prisma.role.count({ where: { isDeleted: false } }),
+        this.prisma.permission.count({ where: { isDeleted: false } }),
         canViewUsers
           ? this.prisma.user.findMany({
-              where: { lastLoginAt: { not: null } },
+              where: { lastLoginAt: { not: null }, isDeleted: false },
               include: recentUserInclude,
               orderBy: { lastLoginAt: 'desc' },
               take: 6,

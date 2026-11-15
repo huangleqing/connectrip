@@ -1,11 +1,20 @@
 /**
  * 权限标识与后端保持一致。
  * 命名约定：模块:资源:动作。
+ * 新增页面按钮时：同步 backend/src/common/constants/permissions.ts 的
+ * BUTTON 定义，并使用 <Access> 或 useAccess() 控制按钮显示。
  */
 export const PERMISSIONS = {
   OPERATION_VIEW: 'operation:view',
   OPERATION_EXPORT: 'operation:export',
   OPERATION_AMOUNT_VIEW: 'operation:amount:view',
+
+  OPERATION_TOUR_CREATE: 'operation:tour:create',
+  OPERATION_TOUR_UPDATE: 'operation:tour:update',
+  OPERATION_TOUR_DELETE: 'operation:tour:delete',
+  OPERATION_LINE_CONFIG_CREATE: 'operation:line:config:create',
+  OPERATION_LINE_CONFIG_UPDATE: 'operation:line:config:update',
+  OPERATION_LINE_CONFIG_DELETE: 'operation:line:config:delete',
 
   OPERATION_LINE_TICKET: 'operation:line:ticket',
   OPERATION_LINE_CHONGQING: 'operation:line:chongqing',
@@ -39,6 +48,18 @@ export const PERMISSIONS = {
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
+export const OPERATION_TOUR_ACTION_PERMISSIONS = [
+  PERMISSIONS.OPERATION_TOUR_CREATE,
+  PERMISSIONS.OPERATION_TOUR_UPDATE,
+  PERMISSIONS.OPERATION_TOUR_DELETE,
+];
+
+export const OPERATION_LINE_CONFIG_PERMISSIONS = [
+  PERMISSIONS.OPERATION_LINE_CONFIG_CREATE,
+  PERMISSIONS.OPERATION_LINE_CONFIG_UPDATE,
+  PERMISSIONS.OPERATION_LINE_CONFIG_DELETE,
+];
+
 /** 线路筛选标签 → 对应的数据权限。角色管理中勾选后，操作中控台才会展示对应线路。 */
 export const OPERATION_LINE_PERMISSION_MAP: Record<string, string> = {
   票务: PERMISSIONS.OPERATION_LINE_TICKET,
@@ -68,6 +89,12 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSIONS.OPERATION_VIEW]: '查看操作中心',
   [PERMISSIONS.OPERATION_EXPORT]: '导出操作数据（Excel）',
   [PERMISSIONS.OPERATION_AMOUNT_VIEW]: '查看操作金额',
+  [PERMISSIONS.OPERATION_TOUR_CREATE]: '新增团队',
+  [PERMISSIONS.OPERATION_TOUR_UPDATE]: '编辑团队',
+  [PERMISSIONS.OPERATION_TOUR_DELETE]: '删除团队',
+  [PERMISSIONS.OPERATION_LINE_CONFIG_CREATE]: '新增线路',
+  [PERMISSIONS.OPERATION_LINE_CONFIG_UPDATE]: '编辑线路',
+  [PERMISSIONS.OPERATION_LINE_CONFIG_DELETE]: '删除线路',
   [PERMISSIONS.OPERATION_LINE_TICKET]: '线路权限 · 票务',
   [PERMISSIONS.OPERATION_LINE_CHONGQING]: '线路权限 · 重庆',
   [PERMISSIONS.OPERATION_LINE_LAOS]: '线路权限 · 老挝-LAO',

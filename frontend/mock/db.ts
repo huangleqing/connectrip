@@ -1,5 +1,6 @@
 import {
   ALL_PERMISSION_CODES,
+  OPERATION_ACTION_CODES,
   OPERATION_LINE_PERMISSION_CODES,
   PERMISSION_CODES,
 } from './permissions';
@@ -70,10 +71,11 @@ export const roles: MockRole[] = existingDatabase?.roles ?? [
     id: 2,
     name: '运营专员',
     code: 'operator',
-    description: '负责日常运营操作，可访问操作中心全部线路并查看登录用户列表，金额默认隐藏。',
+    description: '负责日常运营操作，可访问操作中心全部线路并管理团队/线路按钮，查看登录用户列表，金额默认隐藏。',
     permissions: [
       PERMISSION_CODES.OPERATION_VIEW,
       PERMISSION_CODES.OPERATION_EXPORT,
+      ...OPERATION_ACTION_CODES,
       PERMISSION_CODES.USER_VIEW,
       ...OPERATION_LINE_PERMISSION_CODES,
     ],

@@ -26,6 +26,7 @@ model User {
   phone        String?
   avatar       String?
   status       UserStatus @default(ACTIVE)
+  isDeleted    Boolean    @default(false) @map("delete")
   lastLoginAt  DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -33,6 +34,7 @@ model User {
   roles UserRole[]
 
   @@index([status])
+  @@index([isDeleted])
   @@map("users")
 }
 
@@ -42,26 +44,30 @@ model Role {
   name        String
   description String?  @db.VarChar(255)
   isSystem    Boolean  @default(false)
+  isDeleted   Boolean  @default(false) @map("delete")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   users       UserRole[]
   permissions RolePermission[]
 
+  @@index([isDeleted])
   @@map("roles")
 }
 
 model Permission {
-  id     Int            @id @default(autoincrement())
-  code   String         @unique
-  name   String
-  type   PermissionType
-  module String
-  sort   Int            @default(0)
+  id        Int            @id @default(autoincrement())
+  code      String         @unique
+  name      String
+  type      PermissionType
+  module    String
+  sort      Int            @default(0)
+  isDeleted Boolean        @default(false) @map("delete")
 
   roles RolePermission[]
 
   @@index([module, sort])
+  @@index([isDeleted])
   @@map("permissions")
 }
 
@@ -85,4 +91,62 @@ model RolePermission {
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
+}
+
+model OperationLine {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique @db.VarChar(64)
+  code           String   @unique @db.VarChar(64)
+  permissionCode String   @unique @db.VarChar(100)
+  sort           Int      @default(0)
+  enabled        Boolean  @default(true)
+  isDeleted      Boolean  @default(false) @map("delete")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tours TourGroup[]
+
+  @@index([enabled, sort])
+  @@index([isDeleted])
+  @@map("operation_lines")
+}
+
+model TourGroup {
+  id              Int           @id @default(autoincrement())
+  lineId          Int
+  line            OperationLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
+  stage           String        @db.VarChar(32)
+  orderNo         String        @unique @db.VarChar(64)
+  tourNo          String        @unique @db.VarChar(64)
+  name            String        @db.VarChar(120)
+  flightsOutbound String        @db.Text
+  flightsInbound  String        @db.Text
+  source          String        @db.VarChar(64)
+  agency          String        @db.VarChar(120)
+  peopleTotal     Int
+  peopleAdults    Int
+  peopleChildren  Int
+  owner           String        @db.VarChar(64)
+  assistant       String        @db.VarChar(64)
+  departureDate   String        @db.VarChar(10)
+  returnDate      String        @db.VarChar(10)
+  itinerary       Json
+  operations      Json
+  subcontract     Json
+  hotels          Json
+  restaurants     Json
+  fleet           Json
+  ticket          String        @db.Text
+  visa            String        @db.Text
+  scenic          String        @db.Text
+  performance     String        @db.Text
+  transport       String        @db.Text
+  isDeleted       Boolean       @default(false) @map("delete")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([lineId, departureDate])
+  @@index([stage])
+  @@index([isDeleted])
+  @@map("tour_groups")
 }

@@ -2,11 +2,13 @@ import { PrismaClient, UserStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import {
   ALL_PERMISSION_CODES,
+  OPERATION_ACTION_CODES,
   OPERATION_LINE_PERMISSION_CODES,
   PERMISSION_DEFINITIONS,
   PERMISSIONS,
 } from '../src/common/constants/permissions';
 import { SUPER_ADMIN_ROLE_CODE } from '../src/common/constants/roles';
+import { seedOperationCenter } from './operation-center-seed';
 
 const prisma = new PrismaClient();
 
@@ -178,11 +180,12 @@ const seedRoles = [
   {
     code: 'operator',
     name: '运营专员',
-    description: '负责日常运营操作，可访问操作中心全部线路并查看登录用户列表，金额默认隐藏。',
+    description: '负责日常运营操作，可访问操作中心全部线路并管理团队/线路按钮，查看登录用户列表，金额默认隐藏。',
     isSystem: false,
     permissions: [
       PERMISSIONS.OPERATION_VIEW,
       PERMISSIONS.OPERATION_EXPORT,
+      ...OPERATION_ACTION_CODES,
       PERMISSIONS.USER_VIEW,
       ...OPERATION_LINE_PERMISSION_CODES,
     ],
@@ -309,6 +312,8 @@ async function main() {
       },
     });
   }
+
+  await seedOperationCenter(prisma);
 
   console.log(
     `种子数据完成：${PERMISSION_DEFINITIONS.length} 个权限、${seedRoles.length} 个角色、${seedUsers.length} 个用户`,

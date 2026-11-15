@@ -20,6 +20,7 @@ import type { UserDto } from './users.types';
 
 const userListInclude = Prisma.validator<Prisma.UserInclude>()({
   roles: {
+    where: { role: { isDeleted: false } },
     include: {
       role: true,
     },
@@ -66,7 +67,7 @@ export class UsersService {
     const pageSize = query.pageSize ?? 10;
     const keyword = query.keyword?.trim();
 
-    const where: Prisma.UserWhereInput = {};
+    const where: Prisma.UserWhereInput = { isDeleted: false };
 
     if (query.status) {
       where.status = toDbUserStatus(query.status);
@@ -77,6 +78,7 @@ export class UsersService {
         some: {
           role: {
             code: query.roleCode,
+            isDeleted: false,
           },
         },
       };
@@ -251,7 +253,10 @@ export class UsersService {
       throw new BadRequestException('超级管理员账号不能被删除');
     }
 
-    await this.prisma.user.delete({ where: { id } });
+    await this.prisma.user.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
     return { success: true };
   }
 
@@ -260,7 +265,7 @@ export class UsersService {
       where: { id },
       include: userListInclude,
     });
-    if (!user) {
+    if (!user || user.isDeleted) {
       throw new NotFoundException('用户不存在');
     }
     return user;
@@ -269,7 +274,7 @@ export class UsersService {
   private async resolveRoles(roleIds: number[]): Promise<Role[]> {
     const uniqueIds = Array.from(new Set(roleIds));
     const roles = await this.prisma.role.findMany({
-      where: { id: { in: uniqueIds } },
+      where: { id: { in: uniqueIds }, isDeleted: false },
     });
     if (roles.length !== uniqueIds.length) {
       throw new BadRequestException('请至少选择一个有效角色');

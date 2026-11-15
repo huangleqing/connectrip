@@ -2,6 +2,7 @@ import {
   DownloadOutlined,
   HomeOutlined,
   LockOutlined,
+  PlusOutlined,
   SaveOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -16,10 +17,10 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
+import type { UpdateOperationTourParams } from '@/services/operation';
 import {
   RESOURCE_STATUS_COLORS,
   type HotelRow,
-  type OperationSummary,
   type TourGroup,
 } from '../data';
 import {
@@ -32,17 +33,20 @@ interface HotelTabProps {
   tour: TourGroup;
   canViewAmount: boolean;
   canExport: boolean;
-  onDone: (summary: OperationSummary) => void;
+  canEdit: boolean;
+  onSaveTour: (patch: UpdateOperationTourParams) => Promise<void>;
 }
 
 export default function HotelTab({
   tour,
   canViewAmount,
   canExport,
-  onDone,
+  canEdit,
+  onSaveTour,
 }: HotelTabProps) {
   const { message } = App.useApp();
   const [rows, setRows] = useState<HotelRow[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setRows(tour.hotels.map((row) => ({ ...row })));
@@ -54,16 +58,54 @@ export default function HotelTab({
     );
   };
 
+  const addHotel = () => {
+    setRows((prev) => {
+      const itinerary = tour.itinerary[prev.length];
+      return [
+        ...prev,
+        {
+          id: `hotel-${Date.now()}`,
+          day: itinerary?.day ?? `D${prev.length + 1}`,
+          date: itinerary?.date ?? '',
+          hotel: '',
+          roomSummary: `${tour.people.adults}大${tour.people.children}小 + 1司导房`,
+          price: 0,
+          amount: 0,
+          remark: '',
+          status: '待安排',
+        },
+      ];
+    });
+  };
+
   const summary = useMemo(() => {
     const amount = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
     const pending = rows.filter((row) => row.status === '待安排').length;
     return { amount, pending };
   }, [rows]);
 
-  const handleConfirm = () => {
-    setRows((prev) => prev.map((row) => ({ ...row, status: '已安排' })));
-    message.success(`已确认 ${rows.length} 晚酒店安排`);
-    onDone({ state: 'done', text: `${rows.length}晚已安排` });
+  const handleConfirm = async () => {
+    if (!canEdit) return;
+    const nextRows = rows.map((row) => ({
+      ...row,
+      status: '已安排' as const,
+    }));
+    setSaving(true);
+    try {
+      await onSaveTour({
+        hotels: nextRows,
+        operations: {
+          ...tour.operations,
+          hotel: { state: 'done', text: `${rows.length}晚已安排` },
+        },
+      });
+      setRows(nextRows);
+      message.success(`已确认 ${rows.length} 晚酒店安排`);
+    } catch {
+      // 错误提示由请求层统一处理，保存失败时不改变页面状态
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleExport = async () => {
@@ -108,6 +150,7 @@ export default function HotelTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="填写酒店名称"
           onChange={(event) => updateRow(row.id, { hotel: event.target.value })}
         />
@@ -129,6 +172,7 @@ export default function HotelTab({
           <InputNumber
             min={0}
             value={value}
+            disabled={!canEdit}
             prefix="¥"
             precision={2}
             style={{ width: '100%' }}
@@ -148,6 +192,7 @@ export default function HotelTab({
           <InputNumber
             min={0}
             value={value}
+            disabled={!canEdit}
             prefix="¥"
             precision={2}
             style={{ width: '100%' }}
@@ -164,6 +209,7 @@ export default function HotelTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="房型、早餐、特殊要求"
           onChange={(event) => updateRow(row.id, { remark: event.target.value })}
         />
@@ -241,14 +287,27 @@ export default function HotelTab({
           <em>项</em>
         </div>
         <div className="resource-summary__actions">
+          {canEdit ? (
+            <Button icon={<PlusOutlined />} onClick={addHotel}>
+              添加酒店
+            </Button>
+          ) : null}
           {canExport ? (
             <Button icon={<DownloadOutlined />} onClick={handleExport}>
               导出 Excel
             </Button>
           ) : null}
-          <Button type="primary" icon={<SaveOutlined />} onClick={handleConfirm}>
-            确认全部安排
-          </Button>
+          {canEdit ? (
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={saving}
+              disabled={!rows.length}
+              onClick={handleConfirm}
+            >
+              确认全部安排
+            </Button>
+          ) : null}
         </div>
       </div>
 

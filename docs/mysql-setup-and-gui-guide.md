@@ -252,23 +252,26 @@ npm run db:setup
 
 `db:setup` 实际执行：
 
-1. `prisma migrate deploy`：创建 `users`、`roles`、`permissions`、`user_roles`、`role_permissions` 等表
-2. `prisma db seed`：写入演示权限、角色和用户
+1. `prisma migrate deploy`：创建 `users`、`roles`、`permissions`、`user_roles`、`role_permissions`、`operation_lines`、`tour_groups` 等表
+2. `prisma db seed`：写入演示权限、角色、用户、操作中心线路与样例团队
 
 成功时会看到：
 
 ```text
 Applying migration `20261103000000_init`
+Applying migration `20261114000000_operation_center_persistence`
 All migrations have been successfully applied.
-种子数据完成：29 个权限、4 个角色、12 个用户
+操作中心初始化完成：17 条内置线路，新增 12 个样例团队。
+种子数据完成：35 个权限、4 个角色、12 个用户
 演示账号：admin/admin123、operator/operator123、viewer/viewer123
 ```
 
-如果数据库是旧版本初始化、需要补充操作中心线路/金额权限，执行：
+如果数据库是旧版本初始化、需要补充操作中心权限和数据，执行：
 
 ```bash
 cd backend
 npm run permissions:sync
+npm run operation:seed
 ```
 
 ### 3. 验证数据
@@ -456,6 +459,56 @@ WHERE username = 'admin';
 - 在 DBeaver 中提交事务
 - 刷新后台页面
 - 角色/权限修改会被后端每次请求时重新读取，刷新页面或重新登录后生效
+
+#### 软删除：修改 `delete` 列
+
+`users`、`roles`、`permissions`、`operation_lines`、`tour_groups` 都有 `delete` 列：
+
+- `0`：正常显示
+- `1`：已软删除，接口和后台列表都不会再返回
+
+`delete` 是 MySQL 关键字，写 SQL 时必须加反引号：
+
+```sql
+-- 查看已软删除的团队
+SELECT id, name, `delete`
+FROM tour_groups
+WHERE `delete` = 1;
+
+-- 软删除
+UPDATE tour_groups
+SET `delete` = 1
+WHERE id = 11;
+
+-- 恢复
+UPDATE tour_groups
+SET `delete` = 0
+WHERE id = 11;
+
+-- 如果 DBeaver 使用手动提交
+COMMIT;
+```
+
+在 DBeaver 里直接改表格中的 `delete`：
+
+1. 在左侧数据库树中右键表（例如 `tour_groups`）→ **View Data / 查看数据**，不要使用带 JOIN 的查询结果直接编辑。
+2. 点击数据网格工具栏的 **Edit / 编辑（铅笔图标）**，进入编辑模式。
+3. 双击 `delete` 列的复选框，或选中单元格按空格切换 `0/1`。
+4. 点击 **Save / 保存（磁盘图标）**；如果连接是手动提交模式，再点击 **Commit / 提交**。
+5. 按 `F5` 刷新数据网格和后台页面。
+
+如果铅笔图标不可用：
+
+- 右键连接 → **Edit Connection / 编辑连接** → **General / 常规**，取消勾选 **Read-only connection / 只读连接**，然后断开重连（`F5`）。
+- 确认使用的是有写权限的账号。当前项目的 `gd_travel` 账号已具备 `gd_travel.*` 的 `ALL PRIVILEGES`。
+- 用 SQL 执行 `SHOW GRANTS FOR CURRENT_USER();` 检查权限；如显示只有 `USAGE`，用管理员账号执行：
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON gd_travel.* TO 'gd_travel'@'127.0.0.1';
+FLUSH PRIVILEGES;
+```
+
+> 从数据库直接删除线路时不会自动级联团队；后台“删除线路”会同时软删除该线路下的团队。需要保持一致时，手动补一条团队更新。
 
 > **不要直接修改 `passwordHash`。**
 > 登录密码是 bcrypt 哈希。需要重置密码时，使用后台的“重置密码”功能，或调用：

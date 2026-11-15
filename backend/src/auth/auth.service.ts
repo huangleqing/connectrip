@@ -29,7 +29,11 @@ export class AuthService {
       include: userWithRolesInclude,
     });
 
-    if (!user || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+    if (
+      !user ||
+      user.isDeleted ||
+      !(await bcrypt.compare(dto.password, user.passwordHash))
+    ) {
       throw new UnauthorizedException('账号或密码错误');
     }
 
@@ -56,10 +60,10 @@ export class AuthService {
   async changePassword(userId: number, dto: ChangePasswordDto) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, passwordHash: true },
+      select: { id: true, passwordHash: true, isDeleted: true },
     });
 
-    if (!user) {
+    if (!user || user.isDeleted) {
       throw new UnauthorizedException('登录状态已失效，请重新登录');
     }
 

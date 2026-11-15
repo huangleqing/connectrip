@@ -17,10 +17,10 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
+import type { UpdateOperationTourParams } from '@/services/operation';
 import {
   RESOURCE_STATUS_COLORS,
   type FleetRow,
-  type OperationSummary,
   type TourGroup,
 } from '../data';
 import {
@@ -33,17 +33,20 @@ interface FleetTabProps {
   tour: TourGroup;
   canViewAmount: boolean;
   canExport: boolean;
-  onDone: (summary: OperationSummary) => void;
+  canEdit: boolean;
+  onSaveTour: (patch: UpdateOperationTourParams) => Promise<void>;
 }
 
 export default function FleetTab({
   tour,
   canViewAmount,
   canExport,
-  onDone,
+  canEdit,
+  onSaveTour,
 }: FleetTabProps) {
   const { message } = App.useApp();
   const [rows, setRows] = useState<FleetRow[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setRows(tour.fleet.map((row) => ({ ...row })));
@@ -83,10 +86,28 @@ export default function FleetTab({
     return { amount, days, pending };
   }, [rows]);
 
-  const handleConfirm = () => {
-    setRows((prev) => prev.map((row) => ({ ...row, status: '已安排' })));
-    message.success(`已确认 ${rows.length} 台用车安排`);
-    onDone({ state: 'done', text: `${rows.length}台已安排` });
+  const handleConfirm = async () => {
+    if (!canEdit) return;
+    const nextRows = rows.map((row) => ({
+      ...row,
+      status: '已安排' as const,
+    }));
+    setSaving(true);
+    try {
+      await onSaveTour({
+        fleet: nextRows,
+        operations: {
+          ...tour.operations,
+          car: { state: 'done', text: `${rows.length}台已安排` },
+        },
+      });
+      setRows(nextRows);
+      message.success(`已确认 ${rows.length} 台用车安排`);
+    } catch {
+      // 错误提示由请求层统一处理
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleExport = async () => {
@@ -120,6 +141,7 @@ export default function FleetTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="填写车队 / 供应商名称"
           onChange={(event) => updateRow(row.id, { company: event.target.value })}
         />
@@ -132,6 +154,7 @@ export default function FleetTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="如：38 座旅游大巴"
           onChange={(event) => updateRow(row.id, { vehicle: event.target.value })}
         />
@@ -146,6 +169,7 @@ export default function FleetTab({
         <InputNumber
           min={0}
           value={value}
+          disabled={!canEdit}
           precision={0}
           style={{ width: '100%' }}
           onChange={(next) => updateRow(row.id, { seats: Number(next) || 0 })}
@@ -159,6 +183,7 @@ export default function FleetTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="MM.DD-MM.DD"
           onChange={(event) =>
             updateRow(row.id, { dateRange: event.target.value })
@@ -175,6 +200,7 @@ export default function FleetTab({
         <InputNumber
           min={0}
           value={value}
+          disabled={!canEdit}
           precision={0}
           style={{ width: '100%' }}
           onChange={(next) => updateRow(row.id, { days: Number(next) || 0 })}
@@ -191,6 +217,7 @@ export default function FleetTab({
           <InputNumber
             min={0}
             value={value}
+            disabled={!canEdit}
             prefix="¥"
             precision={2}
             style={{ width: '100%' }}
@@ -207,6 +234,7 @@ export default function FleetTab({
       render: (value: string, row) => (
         <Input
           value={value}
+          disabled={!canEdit}
           placeholder="新车、司机餐补、行李空间等"
           onChange={(event) => updateRow(row.id, { remark: event.target.value })}
         />
@@ -228,15 +256,16 @@ export default function FleetTab({
       key: 'action',
       width: 52,
       align: 'center',
-      render: (_, row) => (
-        <Button
-          type="text"
-          danger
-          size="small"
-          icon={<DeleteOutlined />}
-          onClick={() => removeVehicle(row.id)}
-        />
-      ),
+      render: (_, row) =>
+        canEdit ? (
+          <Button
+            type="text"
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            onClick={() => removeVehicle(row.id)}
+          />
+        ) : null,
     },
   ];
 
@@ -295,22 +324,27 @@ export default function FleetTab({
           <strong>{displayMoney(summary.amount, canViewAmount)}</strong>
         </div>
         <div className="resource-summary__actions">
-          <Button icon={<PlusOutlined />} onClick={addVehicle}>
-            添加车辆
-          </Button>
+          {canEdit ? (
+            <Button icon={<PlusOutlined />} onClick={addVehicle}>
+              添加车辆
+            </Button>
+          ) : null}
           {canExport ? (
             <Button icon={<DownloadOutlined />} onClick={handleExport}>
               导出 Excel
             </Button>
           ) : null}
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            disabled={!rows.length}
-            onClick={handleConfirm}
-          >
-            确认车队安排
-          </Button>
+          {canEdit ? (
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={saving}
+              disabled={!rows.length}
+              onClick={handleConfirm}
+            >
+              确认车队安排
+            </Button>
+          ) : null}
         </div>
       </div>
 

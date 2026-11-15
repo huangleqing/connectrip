@@ -3,17 +3,12 @@ import {
   ArrayNotEmpty,
   ArrayUnique,
   IsArray,
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
 } from 'class-validator';
-import {
-  ALL_PERMISSION_CODES,
-  type PermissionCode,
-} from '../../common/constants/permissions';
 
 const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -42,6 +37,5 @@ export class CreateRoleDto {
   @IsArray({ message: '权限列表必须为数组' })
   @ArrayNotEmpty({ message: '请至少选择一项权限' })
   @ArrayUnique({ message: '权限不能重复' })
-  @IsIn(ALL_PERMISSION_CODES, { each: true, message: '包含无效的权限标识' })
-  permissions: PermissionCode[];
+  permissions: string[];
 }

@@ -52,7 +52,7 @@ export class JwtAuthGuard implements CanActivate {
       include: userWithRolesInclude,
     });
 
-    if (!user || user.status !== 'ACTIVE') {
+    if (!user || user.isDeleted || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('登录状态已失效，请重新登录');
     }
 

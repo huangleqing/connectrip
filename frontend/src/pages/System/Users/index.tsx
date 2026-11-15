@@ -303,9 +303,8 @@ export default function UsersPage() {
             fallback={null}
           >
             <Popconfirm
-              title="删除用户"
-              description={`删除 ${record.nickname} 后不可恢复，是否继续？`}
-              okText="删除"
+              title={`确定删除 ${record.nickname} 吗？`}
+              okText="确定"
               okButtonProps={{ danger: true }}
               cancelText="取消"
               onConfirm={() => handleDelete(record)}

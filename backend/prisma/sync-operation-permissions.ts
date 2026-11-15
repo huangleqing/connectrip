@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PermissionType, PrismaClient } from '@prisma/client';
 import {
+  OPERATION_ACTION_CODES,
   OPERATION_LINE_PERMISSION_CODES,
   PERMISSIONS,
   PERMISSION_DEFINITIONS,
@@ -10,6 +11,7 @@ const prisma = new PrismaClient();
 
 const NEW_PERMISSION_CODES = new Set<string>([
   PERMISSIONS.OPERATION_AMOUNT_VIEW,
+  ...OPERATION_ACTION_CODES,
   ...OPERATION_LINE_PERMISSION_CODES,
 ]);
 
@@ -46,7 +48,10 @@ async function main() {
 
   const roleGrants: Record<string, string[]> = {
     super_admin: Array.from(NEW_PERMISSION_CODES),
-    operator: [...OPERATION_LINE_PERMISSION_CODES],
+    operator: [
+      ...OPERATION_ACTION_CODES,
+      ...OPERATION_LINE_PERMISSION_CODES,
+    ],
     dispatcher: [
       PERMISSIONS.OPERATION_AMOUNT_VIEW,
       ...OPERATION_LINE_PERMISSION_CODES,
@@ -73,11 +78,50 @@ async function main() {
     });
   }
 
+  // 兼容旧版权限：原先拥有 operation:create 的自定义角色，
+  // 自动补齐拆分后的 6 个团队/线路操作权限，再移除旧权限。
+  const legacyPermission = await prisma.permission.findUnique({
+    where: { code: 'operation:create' },
+    select: {
+      id: true,
+      roles: { select: { roleId: true } },
+    },
+  });
+
+  if (legacyPermission) {
+    const actionPermissions = permissions.filter((permission) =>
+      OPERATION_ACTION_CODES.includes(
+        permission.code as (typeof OPERATION_ACTION_CODES)[number],
+      ),
+    );
+    const legacyRoleIds = legacyPermission.roles.map((item) => item.roleId);
+
+    if (legacyRoleIds.length && actionPermissions.length) {
+      await prisma.rolePermission.createMany({
+        data: legacyRoleIds.flatMap((roleId) =>
+          actionPermissions.map((permission) => ({
+            roleId,
+            permissionId: permission.id,
+          })),
+        ),
+        skipDuplicates: true,
+      });
+    }
+
+    await prisma.rolePermission.deleteMany({
+      where: { permissionId: legacyPermission.id },
+    });
+    await prisma.permission.update({
+      where: { id: legacyPermission.id },
+      data: { isDeleted: true },
+    });
+  }
+
   await prisma.role.updateMany({
     where: { code: 'operator' },
     data: {
       description:
-        '负责日常运营操作，可访问操作中心全部线路并查看登录用户列表，金额默认隐藏。',
+        '负责日常运营操作，可访问操作中心全部线路并管理团队/线路按钮，查看登录用户列表，金额默认隐藏。',
     },
   });
   await prisma.role.updateMany({

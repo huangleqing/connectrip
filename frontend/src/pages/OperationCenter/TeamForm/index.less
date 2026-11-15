@@ -1,0 +1,96 @@
+.team-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.team-form__card {
+  border: 1px solid #eef2f7;
+  border-radius: 16px;
+  box-shadow: 0 8px 26px rgba(24, 53, 86, 0.045);
+}
+
+.team-form__card .ant-card-body {
+  padding: 24px 26px;
+}
+
+.team-form__heading {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.team-form__heading h2 {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 6px;
+  color: #1e2f44;
+  font-weight: 650;
+  font-size: 18px;
+}
+
+.team-form__heading h2 .ant-tag {
+  margin-inline-end: 0;
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.team-form__heading p {
+  margin: 0;
+  color: #8c9aad;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.team-form__alert {
+  margin-bottom: 16px;
+  border-radius: 10px;
+}
+
+.team-form__section {
+  margin: 22px 0 14px;
+  padding-bottom: 8px;
+  color: #40536a;
+  font-weight: 600;
+  font-size: 12px;
+  border-bottom: 1px dashed #edf1f6;
+}
+
+.team-form__section:first-child {
+  margin-top: 0;
+}
+
+.team-form .ant-form-item-label > label {
+  color: #607187;
+  font-size: 11px;
+}
+
+.team-form .ant-input,
+.team-form .ant-input-number,
+.team-form .ant-picker,
+.team-form .ant-select-selector {
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.team-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed #e8eef5;
+}
+
+@media (max-width: 768px) {
+  .team-form__card .ant-card-body {
+    padding: 18px 16px;
+  }
+
+  .team-form__heading {
+    flex-direction: column;
+  }
+}

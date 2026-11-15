@@ -35,10 +35,11 @@ import {
   Tooltip,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PermissionTree from '@/components/PermissionTree';
 import { PERMISSIONS, PERMISSION_LABELS, ROLE_TAG_COLORS } from '@/constants/permissions';
 import { useTableRequest } from '@/hooks/useTableRequest';
+import { subscribeOperationDataChanged } from '@/utils/operationEvents';
 import {
   createRole,
   deleteRole,
@@ -84,7 +85,36 @@ export default function RolesPage() {
   const [memberAction, setMemberAction] = useState<'add' | 'remove'>('add');
   const memberFormRef = useRef<ProFormInstance<MemberActionFormValues>>();
 
-  const { data: permissionTree, loading: permissionLoading } = useRequest(getPermissionTree);
+  const {
+    data: permissionTree,
+    loading: permissionLoading,
+    refresh: refreshPermissionTree,
+  } = useRequest(getPermissionTree);
+
+  useEffect(
+    () =>
+      subscribeOperationDataChanged((change) => {
+        if (change.source === 'lines') {
+          void refreshPermissionTree();
+        }
+      }),
+    [refreshPermissionTree],
+  );
+
+  const permissionLabelMap = useMemo(() => {
+    const labels: Record<string, string> = { ...PERMISSION_LABELS };
+    const walk = (nodes: typeof permissionTree) => {
+      (nodes ?? []).forEach((node) => {
+        if (node.children?.length) {
+          walk(node.children);
+        } else {
+          labels[node.key] = node.title;
+        }
+      });
+    };
+    walk(permissionTree);
+    return labels;
+  }, [permissionTree]);
   const { runAsync: runCreate, loading: creating } = useRequest(createRole, { manual: true });
   const { runAsync: runUpdate, loading: updating } = useRequest(updateRole, { manual: true });
   const { runAsync: runDelete } = useRequest(deleteRole, { manual: true });
@@ -252,7 +282,7 @@ export default function RolesPage() {
             <div className="role-permission-tooltip">
               {record.permissions.length
                 ? record.permissions.map((code) => (
-                    <div key={code}>· {PERMISSION_LABELS[code] || code}</div>
+                    <div key={code}>· {permissionLabelMap[code] || code}</div>
                   ))
                 : '暂未分配权限'}
             </div>
@@ -296,9 +326,8 @@ export default function RolesPage() {
         );
         const deleteLink = (
           <Popconfirm
-            title="删除角色"
-            description={`确定删除角色「${record.name}」吗？此操作不可恢复。`}
-            okText="删除"
+            title={`确定删除 ${record.name} 吗？`}
+            okText="确定"
             okButtonProps={{ danger: true }}
             cancelText="取消"
             onConfirm={() => handleDelete(record)}

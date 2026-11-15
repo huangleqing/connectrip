@@ -18,11 +18,13 @@ connectrip/
 │   ├── prisma/
 │   │   ├── schema.prisma
 │   │   ├── migrations/
+│   │   ├── data/              # 操作中心样例团队数据
 │   │   └── seed.ts
 │   ├── src/
 │   │   ├── auth/              # 登录、JWT
 │   │   ├── users/             # 用户管理
 │   │   ├── roles/             # 角色与权限
+│   │   ├── operation/         # 线路、团队与操作详情
 │   │   ├── dashboard/         # 工作台
 │   │   ├── common/            # 守卫、过滤器、拦截器、权限常量
 │   │   └── prisma/
@@ -100,21 +102,23 @@ npm run dev:server    # 关闭 Mock，代理 /api 到 http://localhost:3000
 
 前端地址：http://localhost:8000
 
-如果只想查看前端演示、不启动后端：
+如果只想查看登录、用户和角色等纯前端演示，可以不启动后端：
 
 ```bash
 cd frontend
 npm run dev           # 使用 frontend/mock 内存数据
 ```
 
+> 操作中心的数据已落库到 `operation_lines`、`tour_groups`，需要使用 `npm run dev:server` 连接后端；Mock 模式不提供操作中心接口。
+
 ## 演示账号
 
 | 角色 | 账号 | 密码 | 权限 |
 | --- | --- | --- | --- |
 | 超级管理员 | `admin` | `admin123` | 全部菜单与按钮 |
-| 运营专员 | `operator` | `operator123` | 操作中心 + 用户列表只读 |
+| 运营专员 | `operator` | `operator123` | 操作中心全部线路 + Excel 导出 + 新增/编辑/删除线路与团队 + 用户列表只读，金额隐藏 |
 | 只读访客 | `viewer` | `viewer123` | 仅工作台 |
-| 计调专员 | `zhouhang` | `123456` | 仅操作中心（无导出按钮） |
+| 计调专员 | `zhouhang` | `123456` | 操作中心全部线路 + 金额查看，无导出权限 |
 
 ## 后端说明
 
@@ -126,7 +130,8 @@ npm run dev           # 使用 frontend/mock 内存数据
 - 接口权限由 `@RequirePermissions()` 与全局 `PermissionsGuard` 双重校验
 - 超级管理员角色/账号、当前登录账号等关键对象有服务端保护
 - 密码使用 bcrypt 哈希存储
-- `todayOperations` 目前返回 `0`，待操作中心业务接入后再基于操作日志统计
+- 操作中心数据保存在 `operation_lines`、`tour_groups`；用户、角色、权限、线路、团队均使用 `delete` 列软删除并过滤已删除数据。接口按用户线路权限过滤，并对无金额权限的账号脱敏
+- `todayOperations` 目前仍返回 `0`，尚未接入操作日志统计
 
 后端详细接口契约、Prisma 模型和 NestJS 实现建议见 [docs/backend-integration.md](docs/backend-integration.md)。
 
